@@ -629,6 +629,89 @@ input[type="number"] {
 }
 
 /* ============================================================================
+   Example Cards
+   ============================================================================ */
+
+.examples-container {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.example-card {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 16px;
+	background: #fafafa;
+}
+
+.example-header {
+	margin-bottom: 12px;
+}
+
+.example-header h3 {
+	font-size: 1rem;
+	margin-bottom: 4px;
+	color: var(--primary);
+}
+
+.example-desc {
+	font-size: 0.85rem;
+	color: var(--text-muted);
+	margin: 0;
+}
+
+.example-result {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid var(--border);
+}
+
+.result-message {
+	font-weight: 500;
+	padding: 8px 12px;
+	border-radius: var(--radius);
+	margin: 0 0 12px 0;
+}
+
+.result-message.success {
+	background: #d4edda;
+	color: #155724;
+}
+
+.result-message.error {
+	background: #f8d7da;
+	color: #721c24;
+}
+
+.result-data,
+.result-code {
+	margin-top: 12px;
+}
+
+.result-data h4,
+.result-code h4 {
+	font-size: 0.85rem;
+	color: var(--text-muted);
+	margin-bottom: 8px;
+}
+
+.result-data pre {
+	background: #f1f5f9;
+	padding: 12px;
+	border-radius: var(--radius);
+	overflow-x: auto;
+	font-size: 0.8rem;
+	line-height: 1.4;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+.result-data code {
+	font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+}
+
+/* ============================================================================
    Responsive
    ============================================================================ */
 
