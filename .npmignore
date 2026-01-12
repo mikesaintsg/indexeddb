@@ -1,0 +1,44 @@
+# Source files (only dist/ is published)
+src/
+tests/
+showcase/
+guides/
+configs/
+
+# Build artifacts
+showcase.html
+*.tsbuildinfo
+.eslintcache
+
+# Development files
+.vscode/
+.idea/
+*.log
+*.map
+
+# Config files
+tsconfig.json
+vite.config.ts
+vitest.config.ts
+eslint.config.ts
+.editorconfig
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+
+# Node modules
+node_modules/
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db

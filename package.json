@@ -1,0 +1,71 @@
+{
+	"name": "@mikesaintsg/indexeddb",
+	"version": "0.0.1",
+	"type": "module",
+	"description": "Type-safe IndexedDB wrapper with transaction management, migrations, and full TypeScript support. Zero runtime dependencies.",
+	"keywords": [
+		"typescript",
+		"indexeddb",
+		"database",
+		"browser-storage",
+		"transactions",
+		"migrations",
+		"type-safe",
+		"promise-based",
+		"zero-dependencies"
+	],
+	"author": "Mike S",
+	"license": "MIT",
+	"homepage": "https://github.com/mikesaintsg/indexeddb#readme",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/mikesaintsg/indexeddb.git"
+	},
+	"bugs": {
+		"url": "https://github.com/mikesaintsg/indexeddb/issues"
+	},
+	"engines": {
+		"node": ">=18.0.0"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
+	"sideEffects": false,
+	"scripts": {
+		"dev": "vite --config configs/vite.showcase.config.ts",
+		"build": "npm run clean:dist && npm run check && vite build",
+		"build:showcase": "vite build --config configs/vite.showcase.config.ts",
+		"check": "npm run decache && tsc --noEmit",
+		"check:showcase": "npm run decache && tsc --noEmit -p configs/tsconfig.showcase.json",
+		"test": "npm run decache && vitest run --no-cache",
+		"format": "eslint . --fix",
+		"show": "npm run build:showcase && npm run copy:showcase && npm run clean:showcase",
+		"clean:dist": "node -e \"try{require('fs').rmSync('dist',{recursive:true,force:true})}catch(e){}\"",
+		"clean:showcase": "node -e \"try{require('fs').rmSync('dist/showcase',{recursive:true,force:true})}catch(e){}\"",
+		"copy:showcase": "node -e \"try{require('fs').cpSync('dist/showcase/index.html','showcase.html',{force:true});console.log('Created: showcase.html')}catch(e){throw e}\"",
+		"decache": "node -e \"const fs=require('fs');['.eslintcache','node_modules/.vite','node_modules/.vitest','node_modules/.cache'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true})}catch{}})\"",
+		"prepublishOnly": "npm run test && npm run build"
+	},
+	"devDependencies": {
+		"@types/node": "^25.0.6",
+		"@vitest/browser-playwright": "^4.0.17",
+		"eslint": "^9.39.2",
+		"jiti": "^2.6.1",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.52.0",
+		"vite": "^7.3.1",
+		"vite-plugin-dts": "^4.5.4",
+		"vite-plugin-singlefile": "^2.3.0",
+		"vitest": "^4.0.17"
+	}
+}
