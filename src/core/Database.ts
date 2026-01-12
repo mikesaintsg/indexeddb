@@ -19,6 +19,7 @@ import type {
 	TransactionOptions,
 	TransactionOperation,
 	ChangeCallback,
+	ChangeEvent,
 	ErrorCallback,
 	VersionChangeCallback,
 	BlockedCallback,
@@ -41,6 +42,8 @@ import {
 	ERROR_MESSAGES,
 } from '../constants.js'
 import { Store } from './Store.js'
+import { Transaction } from './Transaction.js'
+import { toStoreNames, promisifyTransaction } from '../helpers.js'
 
 /**
  * Database connection implementation.
@@ -53,10 +56,12 @@ implements DatabaseInterface<Schema> {
 	readonly #storeDefinitions: StoreDefinitions<Schema>
 	readonly #migrations: readonly Migration[]
 	readonly #onBlocked: BlockedCallback | undefined
+	readonly #crossTabSync: boolean
 
 	#db: IDBDatabase | null = null
 	#opening: Promise<IDBDatabase> | null = null
 	#closed = false
+	#channel: BroadcastChannel | null = null
 
 	readonly #changeListeners = new Set<ChangeCallback>()
 	readonly #errorListeners = new Set<ErrorCallback>()
@@ -68,6 +73,21 @@ implements DatabaseInterface<Schema> {
 	constructor(options: DatabaseOptions<Schema>) {
 		assertValidName(options.name)
 		assertValidVersion(options.version)
+
+		this.#name = options.name
+		this.#version = options.version
+		this.#storeDefinitions = options.stores
+		this.#migrations = options.migrations ?? []
+		this.#onBlocked = options.onBlocked
+		this.#crossTabSync = options.crossTabSync !== false
+
+		// Initialize BroadcastChannel for cross-tab sync
+		if (this.#crossTabSync && typeof BroadcastChannel !== 'undefined') {
+			this.#channel = new BroadcastChannel(`idb:${options.name}`)
+			this.#channel.onmessage = (event: MessageEvent<ChangeEvent>) => {
+				this.#handleRemoteChange(event.data)
+			}
+		}
 
 		this.#name = options.name
 		this.#version = options.version
@@ -129,30 +149,79 @@ implements DatabaseInterface<Schema> {
 
 	// ─── Transactions ────────────────────────────────────────
 
-	read<K extends keyof Schema & string>(
-		_storeNames: K | readonly K[],
-		_operation: TransactionOperation<Schema, K>,
+	async read<K extends keyof Schema & string>(
+		storeNames: K | readonly K[],
+		operation: TransactionOperation<Schema, K>,
 	): Promise<void> {
-		// TODO: Phase 6 - Implement explicit transactions
-		// For now, stub with error
-		// The operation callback receives a TransactionInterface<Schema, K>
-		// which provides tx.store(name) to get TransactionStoreInterface
-		return Promise.reject(new Error('Explicit transactions not yet implemented. Coming in Phase 6. Use store methods directly.'))
+		const db = await this.ensureOpen()
+		const names = toStoreNames(storeNames)
+
+		const nativeTx = db.transaction([...names], 'readonly')
+		const tx = new Transaction<Schema, K>(nativeTx)
+
+		try {
+			await operation(tx)
+			// Wait for transaction to complete
+			await promisifyTransaction(nativeTx)
+		} catch (error) {
+			// If operation throws, abort the transaction
+			if (tx.isActive()) {
+				try {
+					tx.abort()
+				} catch {
+					// Transaction may have already been aborted
+				}
+			}
+			throw error
+		}
 	}
 
-	write<K extends keyof Schema & string>(
-		_storeNames: K | readonly K[],
-		_operation: TransactionOperation<Schema, K>,
-		_options?: TransactionOptions,
+	async write<K extends keyof Schema & string>(
+		storeNames: K | readonly K[],
+		operation: TransactionOperation<Schema, K>,
+		options?: TransactionOptions,
 	): Promise<void> {
-		// TODO: Phase 6 - Implement explicit transactions
-		// For now, stub with error
-		return Promise.reject(new Error('Explicit transactions not yet implemented. Coming in Phase 6. Use store methods directly.'))
+		const db = await this.ensureOpen()
+		const names = toStoreNames(storeNames)
+
+		// Create transaction with durability option if supported
+		const txOptions: IDBTransactionOptions | undefined = options?.durability
+			? { durability: options.durability }
+			: undefined
+
+		const namesArray = [...names]
+		const nativeTx = txOptions
+			? db.transaction(namesArray, 'readwrite', txOptions)
+			: db.transaction(namesArray, 'readwrite')
+
+		const tx = new Transaction<Schema, K>(nativeTx)
+
+		try {
+			await operation(tx)
+			// Wait for transaction to complete
+			await promisifyTransaction(nativeTx)
+		} catch (error) {
+			// If operation throws, abort the transaction
+			if (tx.isActive()) {
+				try {
+					tx.abort()
+				} catch {
+					// Transaction may have already been aborted
+				}
+			}
+			throw error
+		}
 	}
 
 	// ─── Lifecycle ───────────────────────────────────────────
 
 	close(): void {
+		// Close BroadcastChannel
+		if (this.#channel) {
+			this.#channel.close()
+			this.#channel = null
+		}
+
 		if (this.#db) {
 			this.#db.close()
 			this.#db = null
@@ -227,13 +296,48 @@ implements DatabaseInterface<Schema> {
 	 * Emits a change event to all listeners.
 	 * @internal
 	 */
-	emitChange(event: Parameters<ChangeCallback>[0]): void {
+	emitChange(event: ChangeEvent): void {
+		// Notify local listeners
 		for (const callback of this.#changeListeners) {
 			try {
 				callback(event)
 			} catch (err) {
 				this.#emitError(err instanceof Error ? err : new Error(String(err)))
 			}
+		}
+
+		// Broadcast to other tabs (only for local changes)
+		if (event.source === 'local' && this.#channel) {
+			try {
+				this.#channel.postMessage(event)
+			} catch {
+				// BroadcastChannel may be closed
+			}
+		}
+	}
+
+	/**
+	 * Handles a change event received from another tab.
+	 */
+	#handleRemoteChange(event: ChangeEvent): void {
+		// Mark as remote and emit to listeners
+		const remoteEvent: ChangeEvent = {
+			...event,
+			source: 'remote',
+		}
+
+		for (const callback of this.#changeListeners) {
+			try {
+				callback(remoteEvent)
+			} catch (err) {
+				this.#emitError(err instanceof Error ? err : new Error(String(err)))
+			}
+		}
+
+		// Also notify the specific store's listeners
+		const store = this.#stores.get(event.storeName)
+		if (store) {
+			store.emitRemoteChange(remoteEvent)
 		}
 	}
 

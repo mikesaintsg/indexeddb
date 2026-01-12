@@ -169,7 +169,7 @@ export class QuotaExceededError extends DatabaseError {
  */
 export class TransactionError extends DatabaseError {
 	constructor(
-		code: 'TRANSACTION_ABORTED' | 'TRANSACTION_INACTIVE',
+		code: 'TRANSACTION_ABORTED' | 'TRANSACTION_INACTIVE' | 'INVALID_STATE',
 		message: string,
 		cause?: unknown,
 	) {

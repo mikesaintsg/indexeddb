@@ -23,6 +23,7 @@ import { NotFoundError, wrapError } from '../errors.js'
 import { toIDBCursorDirection } from '../helpers.js'
 import { Cursor } from './Cursor.js'
 import { KeyCursor } from './KeyCursor.js'
+import { QueryBuilder } from './QueryBuilder.js'
 
 /**
  * Index implementation for querying by indexed fields.
@@ -152,8 +153,12 @@ export class Index<T> implements IndexInterface<T> {
 	// ─── Query Builder ───────────────────────────────────────
 
 	query(): QueryBuilderInterface<T> {
-		// TODO: Phase 5 - Implement query builder
-		throw new Error('Query builder not yet implemented. Coming in Phase 5.')
+		return new QueryBuilder<T>({
+			storeName: this.#storeName,
+			primaryKeyPath: null, // Will query by index
+			indexNames: [this.#indexName],
+			ensureOpen: this.#ensureOpen,
+		})
 	}
 
 	// ─── Iteration ───────────────────────────────────────────

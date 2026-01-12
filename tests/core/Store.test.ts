@@ -45,14 +45,6 @@ function createTestDbName(): string {
 	return `test-store-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-async function deleteDatabase(name: string): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const request = indexedDB.deleteDatabase(name)
-		request.onsuccess = () => resolve()
-		request.onerror = () => reject(request.error ?? new Error('Failed to delete database'))
-	})
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -77,8 +69,7 @@ describe('Store', () => {
 	})
 
 	afterEach(async() => {
-		db.close()
-		await deleteDatabase(dbName)
+		await db.drop()
 	})
 
 	// ─── Accessors ───────────────────────────────────────────
@@ -570,11 +561,22 @@ describe('Store', () => {
 		})
 	})
 
-	// ─── Stubs ───────────────────────────────────────────────
+	// ─── Query Builder Access ────────────────────────────────
 
-	describe('stubs', () => {
-		it('query() throws not implemented', () => {
-			expect(() => db.store('users').query()).toThrow(/not yet implemented/i)
+	describe('query()', () => {
+		it('returns a QueryBuilder', () => {
+			const query = db.store('users').query()
+			expect(query).toBeDefined()
+			expect(typeof query.where).toBe('function')
+			expect(typeof query.filter).toBe('function')
+			expect(typeof query.orderBy).toBe('function')
+			expect(typeof query.limit).toBe('function')
+			expect(typeof query.offset).toBe('function')
+			expect(typeof query.toArray).toBe('function')
+			expect(typeof query.first).toBe('function')
+			expect(typeof query.count).toBe('function')
+			expect(typeof query.keys).toBe('function')
+			expect(typeof query.iterate).toBe('function')
 		})
 	})
 
@@ -597,9 +599,7 @@ describe('Store', () => {
 				const result = await emptyKeyDb.store('items').get('')
 				expect(result?.value).toBe(42)
 			} finally {
-				const name = emptyKeyDb.getName()
-				emptyKeyDb.close()
-				await deleteDatabase(name)
+				await emptyKeyDb.drop()
 			}
 		})
 
@@ -621,9 +621,7 @@ describe('Store', () => {
 				const result = await numDb.store('counters').get(1)
 				expect(result?.count).toBe(100)
 			} finally {
-				const name = numDb.getName()
-				numDb.close()
-				await deleteDatabase(name)
+				await numDb.drop()
 			}
 		})
 

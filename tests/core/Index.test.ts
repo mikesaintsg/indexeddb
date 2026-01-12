@@ -40,14 +40,6 @@ function createTestDbName(): string {
 	return `test-index-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-async function deleteDatabase(name: string): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const request = indexedDB.deleteDatabase(name)
-		request.onsuccess = () => resolve()
-		request.onerror = () => reject(request.error ?? new Error('Failed to delete database'))
-	})
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -74,8 +66,7 @@ describe('Index', () => {
 	})
 
 	afterEach(async() => {
-		db.close()
-		await deleteDatabase(dbName)
+		await db.drop()
 	})
 
 	// ─── Accessors ───────────────────────────────────────────
@@ -434,11 +425,15 @@ describe('Index', () => {
 		})
 	})
 
-	// ─── Query Builder Stub ──────────────────────────────────
+	// ─── Query Builder Access ────────────────────────────────
 
-	describe('stubs', () => {
-		it('query() throws not implemented', () => {
-			expect(() => db.store('users').index('byEmail').query()).toThrow(/not yet implemented/i)
+	describe('query()', () => {
+		it('returns a QueryBuilder', () => {
+			const query = db.store('users').index('byEmail').query()
+			expect(query).toBeDefined()
+			expect(typeof query.where).toBe('function')
+			expect(typeof query.filter).toBe('function')
+			expect(typeof query.toArray).toBe('function')
 		})
 	})
 

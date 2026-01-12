@@ -30,6 +30,7 @@ import { toIDBCursorDirection } from '../helpers.js'
 import { Index } from './Index.js'
 import { Cursor } from './Cursor.js'
 import { KeyCursor } from './KeyCursor.js'
+import { QueryBuilder } from './QueryBuilder.js'
 
 /**
  * Object store implementation.
@@ -259,10 +260,13 @@ export class Store<T> implements StoreInterface<T> {
 	// ─── Query Builder ───────────────────────────────────────
 
 	query(): QueryBuilderInterface<T> {
-		// TODO: Phase 5 - Implement query builder
-		// QueryBuilderInterface provides: where, orderBy, limit, offset, filter, toArray, first, count
-		// where() returns WhereClauseInterface with: equals, notEquals, above, below, between, startsWith, anyOf
-		throw new Error('Query builder not yet implemented. Coming in Phase 5.')
+		const keyPath = this.getKeyPath()
+		return new QueryBuilder<T>({
+			storeName: this.#name,
+			primaryKeyPath: typeof keyPath === 'string' ? keyPath : null,
+			indexNames: this.getIndexNames(),
+			ensureOpen: () => this.#database.ensureOpen(),
+		})
 	}
 
 	// ─── Iteration ───────────────────────────────────────────
@@ -386,5 +390,15 @@ export class Store<T> implements StoreInterface<T> {
 		}
 
 		this.#database.emitChange(event)
+	}
+
+	/**
+	 * Emits a remote change event to store listeners.
+	 * @internal
+	 */
+	emitRemoteChange(event: ChangeEvent): void {
+		for (const callback of this.#changeListeners) {
+			try { callback(event) } catch { /* ignore */ }
+		}
 	}
 }

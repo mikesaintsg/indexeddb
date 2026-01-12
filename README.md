@@ -2,10 +2,6 @@
 
 > A focused IndexedDB wrapper that enhances the native API without abstracting it away
 
-## Status
-
-🚧 **In Development** — Not yet ready for production use
-
 ## Features
 
 - ✅ **Type Safety** — Generic schema types with full TypeScript support
@@ -15,7 +11,9 @@
 - ✅ **Auto-batching** — Array operations use single transaction
 - ✅ **Cross-tab Sync** — Built-in BroadcastChannel integration
 - ✅ **Query Builder** — Fluent API mapping to IDBKeyRange
+- ✅ **Transactions** — Multi-store atomic operations
 - ✅ **Migrations** — Version-based schema migrations
+- ✅ **Cursors** — Async generators with early break support
 - ✅ **Zero Dependencies** — Built entirely on Web Platform APIs
 
 ## Installation
@@ -76,8 +74,6 @@ const nativeDb = db.native
 ## Documentation
 
 - **[API Guide](./guides/indexeddb.md)** — Comprehensive usage documentation
-- **[Design Document](./guides/DESIGN.md)** — Architecture and design decisions
-- **[Project Plan](./guides/PLAN.md)** — Development phases and roadmap
 
 ## Development
 

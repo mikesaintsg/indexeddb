@@ -45,14 +45,6 @@ function createTestDbName(): string {
 	return `test-db-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-async function deleteDatabase(name: string): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const request = indexedDB.deleteDatabase(name)
-		request.onsuccess = () => resolve()
-		request.onerror = () => reject(request.error ?? new Error('Failed to delete database'))
-	})
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -67,10 +59,9 @@ describe('Database', () => {
 
 	afterEach(async() => {
 		if (db) {
-			db.close()
+			await db.drop()
 			db = null
 		}
-		await deleteDatabase(dbName)
 	})
 
 	// ─── Creation ────────────────────────────────────────────
@@ -533,29 +524,33 @@ describe('Database', () => {
 		})
 	})
 
-	// ─── Transaction Stubs ───────────────────────────────────
+	// ─── Transaction Methods ─────────────────────────────────
 
-	describe('transaction stubs', () => {
-		it('read() throws not implemented error', async() => {
+	describe('transactions', () => {
+		it('read() creates readonly transaction', async() => {
 			db = createDatabase<TestSchema>({
 				name: dbName,
 				version: 1,
 				stores: { users: {}, posts: {} },
 			})
 
-			await expect(db.read('users', async() => {
-			})).rejects.toThrow(/not yet implemented/i)
+			// read() should now work (transactions implemented)
+			await db.read('users', (tx) => {
+				expect(tx.getMode()).toBe('readonly')
+			})
 		})
 
-		it('write() throws not implemented error', async() => {
+		it('write() creates readwrite transaction', async() => {
 			db = createDatabase<TestSchema>({
 				name: dbName,
 				version: 1,
 				stores: { users: {}, posts: {} },
 			})
 
-			await expect(db.write('users', async() => {
-			})).rejects.toThrow(/not yet implemented/i)
+			// write() should now work (transactions implemented)
+			await db.write('users', (tx) => {
+				expect(tx.getMode()).toBe('readwrite')
+			})
 		})
 	})
 
@@ -589,8 +584,7 @@ describe('Database', () => {
 				expect(users1[0]?.id).toBe('u1')
 				expect(users2[0]?.id).toBe('u2')
 			} finally {
-				db2.close()
-				await deleteDatabase(name2)
+				await db2.drop()
 			}
 		})
 	})
