@@ -78,4 +78,15 @@ export default defineConfig(
 			'@typescript-eslint/no-unsafe-member-access': 'off',
 		},
 	},
+
+	// Showcase files - relaxed rules for demo code
+	{
+		files: ['showcase/**/*.ts'],
+		rules: {
+			'@typescript-eslint/no-unsafe-assignment': 'off',
+			'@typescript-eslint/no-unsafe-member-access': 'off',
+			'@typescript-eslint/no-unsafe-argument': 'off',
+			'no-console': 'off',
+		},
+	},
 )

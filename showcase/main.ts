@@ -86,6 +86,68 @@ let activeTab: 'todos' | 'notes' | 'query' | 'events' = 'todos'
 const eventLog: ChangeEvent[] = []
 
 // ============================================================================
+// Element References
+// ============================================================================
+
+interface AppElements {
+	container: HTMLDivElement
+	header: HTMLElement
+	nav: HTMLElement
+	content: HTMLElement
+	footer: HTMLElement
+}
+
+interface TodoElements {
+	titleInput: HTMLInputElement
+	prioritySelect: HTMLSelectElement
+	addButton: HTMLButtonElement
+	loadSamplesButton: HTMLButtonElement
+	clearCompletedButton: HTMLButtonElement
+	clearAllButton: HTMLButtonElement
+	filterAllButton: HTMLButtonElement
+	filterActiveButton: HTMLButtonElement
+	filterCompletedButton: HTMLButtonElement
+	listContainer: HTMLDivElement
+	stats: HTMLDivElement
+}
+
+interface NoteElements {
+	titleInput: HTMLInputElement
+	contentInput: HTMLInputElement
+	colorSelect: HTMLSelectElement
+	addButton: HTMLButtonElement
+	loadSamplesButton: HTMLButtonElement
+	clearAllButton: HTMLButtonElement
+	grid: HTMLDivElement
+}
+
+interface QueryElements {
+	prioritySelect: HTMLSelectElement
+	statusSelect: HTMLSelectElement
+	limitInput: HTMLInputElement
+	prevButton: HTMLButtonElement
+	nextButton: HTMLButtonElement
+	pageInfo: HTMLSpanElement
+	runButton: HTMLButtonElement
+	results: HTMLDivElement
+	codeBlock: HTMLElement
+}
+
+interface EventsElements {
+	triggerAddButton: HTMLButtonElement
+	triggerSetButton: HTMLButtonElement
+	triggerRemoveButton: HTMLButtonElement
+	clearLogButton: HTMLButtonElement
+	logContent: HTMLDivElement
+}
+
+let appElements: AppElements | null = null
+let todoElements: TodoElements | null = null
+let noteElements: NoteElements | null = null
+let queryElements: QueryElements | null = null
+let eventsElements: EventsElements | null = null
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
@@ -93,10 +155,41 @@ function generateId(): string {
 	return Math.random().toString(36).slice(2, 11)
 }
 
-function escapeHtml(text: string): string {
-	const div = document.createElement('div')
-	div.textContent = text
-	return div.innerHTML
+function createElement<K extends keyof HTMLElementTagNameMap>(
+	tag: K,
+	options?: {
+		className?: string
+		textContent?: string
+		id?: string
+		type?: string
+		placeholder?: string
+		value?: string
+		min?: string
+		max?: string
+		dataset?: Record<string, string>
+	},
+): HTMLElementTagNameMap[K] {
+	const element = document.createElement(tag)
+	if (options?.className) element.className = options.className
+	if (options?.textContent) element.textContent = options.textContent
+	if (options?.id) element.id = options.id
+	if (options?.type && 'type' in element) (element as HTMLInputElement).type = options.type
+	if (options?.placeholder && 'placeholder' in element) (element as HTMLInputElement).placeholder = options.placeholder
+	if (options?.value && 'value' in element) (element as HTMLInputElement).value = options.value
+	if (options?.min && 'min' in element) (element as HTMLInputElement).min = options.min
+	if (options?.max && 'max' in element) (element as HTMLInputElement).max = options.max
+	if (options?.dataset) {
+		Object.entries(options.dataset).forEach(([key, value]) => {
+			element.dataset[key] = value
+		})
+	}
+	return element
+}
+
+function createOption(value: string, text: string, selected = false): HTMLOptionElement {
+	const option = createElement('option', { value, textContent: text })
+	option.selected = selected
+	return option
 }
 
 function formatTime(timestamp: number): string {
@@ -126,238 +219,575 @@ function setupEventLogging(): void {
 }
 
 function updateEventLogUI(): void {
-	const logEl = document.getElementById('event-log-content')
-	if (!logEl) return
+	if (!eventsElements) return
+
+	const { logContent } = eventsElements
+
+	// Clear existing content
+	logContent.innerHTML = ''
 
 	if (eventLog.length === 0) {
-		logEl.innerHTML = '<p class="placeholder">No events yet. Make some changes!</p>'
+		const placeholder = createElement('p', {
+			className: 'placeholder',
+			textContent: 'No events yet. Make some changes!',
+		})
+		logContent.appendChild(placeholder)
 		return
 	}
 
-	logEl.innerHTML = `<ul class="event-list">
-		${eventLog.slice(0, 20).map((e) => {
+	const list = createElement('ul', { className: 'event-list' })
+
+	eventLog.slice(0, 20).forEach((e) => {
 		const time = new Date().toLocaleTimeString()
 		const cls = e.source === 'remote' ? 'remote' : 'local'
-		return `<li class="${cls}">
-				<span class="event-time">${time}</span>
-				<span class="event-source">${e.source.toUpperCase()}</span>
-				<span class="event-type">${e.type}</span>
-				<span class="event-store">${e.storeName}</span>
-				<span class="event-keys">[${e.keys.slice(0, 3).join(', ')}${e.keys.length > 3 ? '...' : ''}]</span>
-			</li>`
-	}).join('')}
-	</ul>`
+
+		const li = createElement('li', { className: cls })
+
+		const timeSpan = createElement('span', {
+			className: 'event-time',
+			textContent: time,
+		})
+
+		const sourceSpan = createElement('span', {
+			className: 'event-source',
+			textContent: e.source.toUpperCase(),
+		})
+
+		const typeSpan = createElement('span', {
+			className: 'event-type',
+			textContent: e.type,
+		})
+
+		const storeSpan = createElement('span', {
+			className: 'event-store',
+			textContent: e.storeName,
+		})
+
+		const keysText = e.keys.slice(0, 3).map(k => {
+			if (typeof k === 'string') return k
+			if (typeof k === 'number') return String(k)
+			if (k instanceof Date) return k.toISOString()
+			return JSON.stringify(k)
+		}).join(', ')
+		const keysSpan = createElement('span', {
+			className: 'event-keys',
+			textContent: `[${keysText}${e.keys.length > 3 ? '...' : ''}]`,
+		})
+
+		li.append(timeSpan, sourceSpan, typeSpan, storeSpan, keysSpan)
+		list.appendChild(li)
+	})
+
+	logContent.appendChild(list)
 }
 
 // ============================================================================
 // Rendering Functions
 // ============================================================================
 
+function createAppStructure(): AppElements {
+	const container = createElement('div', { className: 'container' })
+
+	// Header
+	const header = createElement('header')
+	const h1 = createElement('h1', { textContent: '🗄️ IndexedDB Showcase' })
+	const p = createElement('p', { textContent: 'Interactive demo of @mikesaintsg/indexeddb features' })
+	header.append(h1, p)
+
+	// Navigation
+	const nav = createElement('nav', { className: 'tabs' })
+
+	// Content area
+	const content = createElement('main', { id: 'content' })
+
+	// Footer
+	const footer = createElement('footer')
+	const footerP = createElement('p', {
+		textContent: '💡 Open this page in another tab to see cross-tab sync in action!',
+	})
+	footer.appendChild(footerP)
+
+	container.append(header, nav, content, footer)
+
+	return { container, header, nav, content, footer }
+}
+
+function createTabButtons(elements: AppElements): void {
+	const { nav } = elements
+
+	const tabs: { id: typeof activeTab; emoji: string; label: string }[] = [
+		{ id: 'todos', emoji: '📋', label: 'Todos' },
+		{ id: 'notes', emoji: '📝', label: 'Notes' },
+		{ id: 'query', emoji: '🔍', label: 'Query Builder' },
+		{ id: 'events', emoji: '📡', label: 'Live Events' },
+	]
+
+	tabs.forEach(({ id, emoji, label }) => {
+		const button = createElement('button', {
+			className: `tab ${activeTab === id ? 'active' : ''}`,
+			textContent: `${emoji} ${label}`,
+		})
+		button.dataset.tab = id
+		button.addEventListener('click', () => {
+			activeTab = id
+			render()
+		})
+		nav.appendChild(button)
+	})
+}
+
 function render(): void {
 	const app = document.getElementById('app')
 	if (!app) return
 
-	app.innerHTML = `
-		<div class="container">
-			<header>
-				<h1>🗄️ IndexedDB Showcase</h1>
-				<p>Interactive demo of @mikesaintsg/indexeddb features</p>
-			</header>
-
-			<nav class="tabs">
-				<button class="tab ${activeTab === 'todos' ? 'active' : ''}" data-tab="todos">📋 Todos</button>
-				<button class="tab ${activeTab === 'notes' ? 'active' : ''}" data-tab="notes">📝 Notes</button>
-				<button class="tab ${activeTab === 'query' ? 'active' : ''}" data-tab="query">🔍 Query Builder</button>
-				<button class="tab ${activeTab === 'events' ? 'active' : ''}" data-tab="events">📡 Live Events</button>
-			</nav>
-
-			<main id="content"></main>
-
-			<footer>
-				<p>💡 Open this page in another tab to see cross-tab sync in action!</p>
-			</footer>
-		</div>
-	`
+	// Clear and create structure if needed
+	if (!appElements) {
+		app.innerHTML = ''
+		appElements = createAppStructure()
+		createTabButtons(appElements)
+		app.appendChild(appElements.container)
+	} else {
+		// Update tab active states
+		const tabs = appElements.nav.querySelectorAll('.tab')
+		tabs.forEach(tab => {
+			const btn = tab as HTMLButtonElement
+			btn.classList.toggle('active', btn.dataset.tab === activeTab)
+		})
+	}
 
 	renderContent()
-	attachEventListeners()
 }
 
 function renderContent(): void {
-	const content = document.getElementById('content')
-	if (!content) return
+	if (!appElements) return
+	const { content } = appElements
+
+	content.innerHTML = ''
 
 	switch (activeTab) {
 		case 'todos':
-			content.innerHTML = renderTodosTab()
-			void loadTodos()
+			renderTodosTab(content)
 			break
 		case 'notes':
-			content.innerHTML = renderNotesTab()
-			void loadNotes()
+			renderNotesTab(content)
 			break
 		case 'query':
-			content.innerHTML = renderQueryTab()
+			renderQueryTab(content)
 			break
 		case 'events':
-			content.innerHTML = renderEventsTab()
+			renderEventsTab(content)
 			break
 	}
 }
 
-function renderTodosTab(): string {
-	return `
-		<section class="card">
-			<h2>Todo List — CRUD Operations</h2>
-			<p class="subtitle">Demonstrates: <code>add()</code>, <code>set()</code>, <code>get()</code>, <code>remove()</code>, <code>all()</code></p>
+function renderTodosTab(content: HTMLElement): void {
+	const section = createElement('section', { className: 'card' })
 
-			<div class="form-row">
-				<input type="text" id="todo-title" placeholder="What needs to be done?" />
-				<select id="todo-priority">
-					<option value="low">🟢 Low</option>
-					<option value="medium" selected>🟡 Medium</option>
-					<option value="high">🔴 High</option>
-				</select>
-				<button id="add-todo" class="btn primary">Add Todo</button>
-			</div>
+	// Header
+	const h2 = createElement('h2', { textContent: 'Todo List — CRUD Operations' })
+	const subtitle = createElement('p', { className: 'subtitle' })
+	subtitle.innerHTML = 'Demonstrates: <code>add()</code>, <code>set()</code>, <code>get()</code>, <code>remove()</code>, <code>all()</code>'
 
-			<div class="action-row">
-				<button id="load-samples" class="btn secondary">Load Sample Todos</button>
-				<button id="clear-completed" class="btn warning">Clear Completed</button>
-				<button id="clear-todos" class="btn danger">Clear All</button>
-			</div>
+	// Form row
+	const formRow = createElement('div', { className: 'form-row' })
+	const titleInput = createElement('input', {
+		type: 'text',
+		id: 'todo-title',
+		placeholder: 'What needs to be done?',
+	})
+	const prioritySelect = createElement('select', { id: 'todo-priority' })
+	prioritySelect.append(
+		createOption('low', '🟢 Low'),
+		createOption('medium', '🟡 Medium', true),
+		createOption('high', '🔴 High'),
+	)
+	const addButton = createElement('button', {
+		id: 'add-todo',
+		className: 'btn primary',
+		textContent: 'Add Todo',
+	})
+	formRow.append(titleInput, prioritySelect, addButton)
 
-			<div class="filter-row">
-				<button class="filter-btn active" data-filter="all">All</button>
-				<button class="filter-btn" data-filter="active">Active</button>
-				<button class="filter-btn" data-filter="completed">Completed</button>
-			</div>
+	// Action row
+	const actionRow = createElement('div', { className: 'action-row' })
+	const loadSamplesButton = createElement('button', {
+		id: 'load-samples',
+		className: 'btn secondary',
+		textContent: 'Load Sample Todos',
+	})
+	const clearCompletedButton = createElement('button', {
+		id: 'clear-completed',
+		className: 'btn warning',
+		textContent: 'Clear Completed',
+	})
+	const clearAllButton = createElement('button', {
+		id: 'clear-todos',
+		className: 'btn danger',
+		textContent: 'Clear All',
+	})
+	actionRow.append(loadSamplesButton, clearCompletedButton, clearAllButton)
 
-			<div id="todo-list" class="todo-list">
-				<div class="loading">Loading...</div>
-			</div>
+	// Filter row
+	const filterRow = createElement('div', { className: 'filter-row' })
+	const filterAllButton = createElement('button', {
+		className: 'filter-btn active',
+		textContent: 'All',
+	})
+	filterAllButton.dataset.filter = 'all'
+	const filterActiveButton = createElement('button', {
+		className: 'filter-btn',
+		textContent: 'Active',
+	})
+	filterActiveButton.dataset.filter = 'active'
+	const filterCompletedButton = createElement('button', {
+		className: 'filter-btn',
+		textContent: 'Completed',
+	})
+	filterCompletedButton.dataset.filter = 'completed'
+	filterRow.append(filterAllButton, filterActiveButton, filterCompletedButton)
 
-			<div class="stats" id="todo-stats"></div>
-		</section>
-	`
+	// List container
+	const listContainer = createElement('div', {
+		id: 'todo-list',
+		className: 'todo-list',
+	})
+	const loading = createElement('div', {
+		className: 'loading',
+		textContent: 'Loading...',
+	})
+	listContainer.appendChild(loading)
+
+	// Stats
+	const stats = createElement('div', { className: 'stats', id: 'todo-stats' })
+
+	section.append(h2, subtitle, formRow, actionRow, filterRow, listContainer, stats)
+	content.appendChild(section)
+
+	// Store element references
+	todoElements = {
+		titleInput,
+		prioritySelect,
+		addButton,
+		loadSamplesButton,
+		clearCompletedButton,
+		clearAllButton,
+		filterAllButton,
+		filterActiveButton,
+		filterCompletedButton,
+		listContainer,
+		stats,
+	}
+
+	// Attach handlers and load data
+	attachTodoHandlers()
+	void loadTodos()
 }
 
-function renderNotesTab(): string {
-	return `
-		<section class="card">
-			<h2>Sticky Notes — Batch Operations & Transactions</h2>
-			<p class="subtitle">Demonstrates: <code>set([...])</code> batching, <code>db.write()</code> transactions</p>
+function renderNotesTab(content: HTMLElement): void {
+	const section = createElement('section', { className: 'card' })
 
-			<div class="form-row">
-				<input type="text" id="note-title" placeholder="Note title" />
-				<input type="text" id="note-content" placeholder="Note content" />
-				<select id="note-color">
-					<option value="#fff3cd">🟡 Yellow</option>
-					<option value="#d1ecf1">🔵 Blue</option>
-					<option value="#d4edda">🟢 Green</option>
-					<option value="#f8d7da">🔴 Pink</option>
-				</select>
-				<button id="add-note" class="btn primary">Add Note</button>
-			</div>
+	// Header
+	const h2 = createElement('h2', { textContent: 'Sticky Notes — Batch Operations & Transactions' })
+	const subtitle = createElement('p', { className: 'subtitle' })
+	subtitle.innerHTML = 'Demonstrates: <code>set([...])</code> batching, <code>db.write()</code> transactions'
 
-			<div class="action-row">
-				<button id="load-sample-notes" class="btn secondary">Load Sample Notes (Batch)</button>
-				<button id="clear-notes" class="btn danger">Clear All (Transaction)</button>
-			</div>
+	// Form row
+	const formRow = createElement('div', { className: 'form-row' })
+	const titleInput = createElement('input', {
+		type: 'text',
+		id: 'note-title',
+		placeholder: 'Note title',
+	})
+	const contentInput = createElement('input', {
+		type: 'text',
+		id: 'note-content',
+		placeholder: 'Note content',
+	})
+	const colorSelect = createElement('select', { id: 'note-color' })
+	colorSelect.append(
+		createOption('#fff3cd', '🟡 Yellow'),
+		createOption('#d1ecf1', '🔵 Blue'),
+		createOption('#d4edda', '🟢 Green'),
+		createOption('#f8d7da', '🔴 Pink'),
+	)
+	const addButton = createElement('button', {
+		id: 'add-note',
+		className: 'btn primary',
+		textContent: 'Add Note',
+	})
+	formRow.append(titleInput, contentInput, colorSelect, addButton)
 
-			<div id="notes-grid" class="notes-grid">
-				<div class="loading">Loading...</div>
-			</div>
-		</section>
-	`
+	// Action row
+	const actionRow = createElement('div', { className: 'action-row' })
+	const loadSamplesButton = createElement('button', {
+		id: 'load-sample-notes',
+		className: 'btn secondary',
+		textContent: 'Load Sample Notes (Batch)',
+	})
+	const clearAllButton = createElement('button', {
+		id: 'clear-notes',
+		className: 'btn danger',
+		textContent: 'Clear All (Transaction)',
+	})
+	actionRow.append(loadSamplesButton, clearAllButton)
+
+	// Grid
+	const grid = createElement('div', {
+		id: 'notes-grid',
+		className: 'notes-grid',
+	})
+	const loading = createElement('div', {
+		className: 'loading',
+		textContent: 'Loading...',
+	})
+	grid.appendChild(loading)
+
+	section.append(h2, subtitle, formRow, actionRow, grid)
+	content.appendChild(section)
+
+	// Store element references
+	noteElements = {
+		titleInput,
+		contentInput,
+		colorSelect,
+		addButton,
+		loadSamplesButton,
+		clearAllButton,
+		grid,
+	}
+
+	// Attach handlers and load data
+	attachNoteHandlers()
+	void loadNotes()
 }
 
-function renderQueryTab(): string {
-	return `
-		<section class="card">
-			<h2>Query Builder — Advanced Queries</h2>
-			<p class="subtitle">Demonstrates: <code>query()</code>, <code>where()</code>, <code>filter()</code>, <code>limit()</code>, <code>offset()</code></p>
+function renderQueryTab(content: HTMLElement): void {
+	const section = createElement('section', { className: 'card' })
 
-			<div class="query-builder">
-				<div class="query-row">
-					<label>Filter by Priority:</label>
-					<select id="query-priority">
-						<option value="">All Priorities</option>
-						<option value="high">🔴 High Only</option>
-						<option value="medium">🟡 Medium Only</option>
-						<option value="low">🟢 Low Only</option>
-					</select>
-				</div>
+	// Header
+	const h2 = createElement('h2', { textContent: 'Query Builder — Advanced Queries' })
+	const subtitle = createElement('p', { className: 'subtitle' })
+	subtitle.innerHTML = 'Demonstrates: <code>query()</code>, <code>where()</code>, <code>filter()</code>, <code>limit()</code>, <code>offset()</code>'
 
-				<div class="query-row">
-					<label>Status:</label>
-					<select id="query-status">
-						<option value="">All Status</option>
-						<option value="active">Active Only</option>
-						<option value="completed">Completed Only</option>
-					</select>
-				</div>
+	// Query builder
+	const queryBuilder = createElement('div', { className: 'query-builder' })
 
-				<div class="query-row">
-					<label>Pagination:</label>
-					<input type="number" id="query-limit" value="3" min="1" max="20" />
-					<span>items per page</span>
-					<button id="prev-page" class="btn small">← Prev</button>
-					<span id="page-info">Page 1</span>
-					<button id="next-page" class="btn small">Next →</button>
-				</div>
+	// Priority row
+	const priorityRow = createElement('div', { className: 'query-row' })
+	const priorityLabel = createElement('label', { textContent: 'Filter by Priority:' })
+	const prioritySelect = createElement('select', { id: 'query-priority' })
+	prioritySelect.append(
+		createOption('', 'All Priorities'),
+		createOption('high', '🔴 High Only'),
+		createOption('medium', '🟡 Medium Only'),
+		createOption('low', '🟢 Low Only'),
+	)
+	priorityRow.append(priorityLabel, prioritySelect)
 
-				<button id="run-query" class="btn primary">Run Query</button>
-			</div>
+	// Status row
+	const statusRow = createElement('div', { className: 'query-row' })
+	const statusLabel = createElement('label', { textContent: 'Status:' })
+	const statusSelect = createElement('select', { id: 'query-status' })
+	statusSelect.append(
+		createOption('', 'All Status'),
+		createOption('active', 'Active Only'),
+		createOption('completed', 'Completed Only'),
+	)
+	statusRow.append(statusLabel, statusSelect)
 
-			<div id="query-results" class="query-results">
-				<p class="placeholder">Click "Run Query" to see results</p>
-			</div>
+	// Pagination row
+	const paginationRow = createElement('div', { className: 'query-row' })
+	const paginationLabel = createElement('label', { textContent: 'Pagination:' })
+	const limitInput = createElement('input', {
+		type: 'number',
+		id: 'query-limit',
+		value: '3',
+		min: '1',
+		max: '20',
+	})
+	const itemsSpan = createElement('span', { textContent: 'items per page' })
+	const prevButton = createElement('button', {
+		id: 'prev-page',
+		className: 'btn small',
+		textContent: '← Prev',
+	})
+	const pageInfo = createElement('span', {
+		id: 'page-info',
+		textContent: 'Page 1',
+	})
+	const nextButton = createElement('button', {
+		id: 'next-page',
+		className: 'btn small',
+		textContent: 'Next →',
+	})
+	paginationRow.append(paginationLabel, limitInput, itemsSpan, prevButton, pageInfo, nextButton)
 
-			<div class="code-section">
-				<h3>Generated Code</h3>
-				<div id="query-code" class="code-block">
-					<pre><code>// Query code will appear here</code></pre>
-				</div>
-			</div>
-		</section>
-	`
+	// Run button
+	const runButton = createElement('button', {
+		id: 'run-query',
+		className: 'btn primary',
+		textContent: 'Run Query',
+	})
+
+	queryBuilder.append(priorityRow, statusRow, paginationRow, runButton)
+
+	// Results
+	const results = createElement('div', {
+		id: 'query-results',
+		className: 'query-results',
+	})
+	const placeholder = createElement('p', {
+		className: 'placeholder',
+		textContent: 'Click "Run Query" to see results',
+	})
+	results.appendChild(placeholder)
+
+	// Code section
+	const codeSection = createElement('div', { className: 'code-section' })
+	const codeH3 = createElement('h3', { textContent: 'Generated Code' })
+	const codeBlock = createElement('div', {
+		id: 'query-code',
+		className: 'code-block',
+	})
+	const codePre = createElement('pre')
+	const code = createElement('code', {
+		textContent: '// Query code will appear here',
+	})
+	codePre.appendChild(code)
+	codeBlock.appendChild(codePre)
+	codeSection.append(codeH3, codeBlock)
+
+	section.append(h2, subtitle, queryBuilder, results, codeSection)
+	content.appendChild(section)
+
+	// Store element references
+	queryElements = {
+		prioritySelect,
+		statusSelect,
+		limitInput,
+		prevButton,
+		nextButton,
+		pageInfo,
+		runButton,
+		results,
+		codeBlock,
+	}
+
+	// Attach handlers
+	attachQueryHandlers()
 }
 
-function renderEventsTab(): string {
-	return `
-		<section class="card">
-			<h2>Live Events — Cross-Tab Synchronization</h2>
-			<p class="subtitle">Demonstrates: <code>onChange()</code>, <code>BroadcastChannel</code> sync</p>
+function renderEventsTab(content: HTMLElement): void {
+	const section = createElement('section', { className: 'card' })
 
-			<div class="info-box">
-				<p>📡 <strong>Open this page in another browser tab</strong> and make changes.
-				You'll see events appear here in real-time!</p>
-				<p>🔵 <strong>LOCAL</strong> events are from this tab. 🟠 <strong>REMOTE</strong> events are from other tabs.</p>
-			</div>
+	// Header
+	const h2 = createElement('h2', { textContent: 'Live Events — Cross-Tab Synchronization' })
+	const subtitle = createElement('p', { className: 'subtitle' })
+	subtitle.innerHTML = 'Demonstrates: <code>onChange()</code>, <code>BroadcastChannel</code> sync'
 
-			<div class="action-row">
-				<button id="trigger-add" class="btn secondary">Trigger Add Event</button>
-				<button id="trigger-set" class="btn secondary">Trigger Set Event</button>
-				<button id="trigger-remove" class="btn secondary">Trigger Remove Event</button>
-				<button id="clear-log" class="btn danger">Clear Log</button>
-			</div>
+	// Info box
+	const infoBox = createElement('div', { className: 'info-box' })
+	const infoP1 = createElement('p')
+	infoP1.innerHTML = '📡 <strong>Open this page in another browser tab</strong> and make changes. You\'ll see events appear here in real-time!'
+	const infoP2 = createElement('p')
+	infoP2.innerHTML = '🔵 <strong>LOCAL</strong> events are from this tab. 🟠 <strong>REMOTE</strong> events are from other tabs.'
+	infoBox.append(infoP1, infoP2)
 
-			<div id="event-log-content" class="event-log">
-				<p class="placeholder">No events yet. Make some changes!</p>
-			</div>
-		</section>
-	`
+	// Action row
+	const actionRow = createElement('div', { className: 'action-row' })
+	const triggerAddButton = createElement('button', {
+		id: 'trigger-add',
+		className: 'btn secondary',
+		textContent: 'Trigger Add Event',
+	})
+	const triggerSetButton = createElement('button', {
+		id: 'trigger-set',
+		className: 'btn secondary',
+		textContent: 'Trigger Set Event',
+	})
+	const triggerRemoveButton = createElement('button', {
+		id: 'trigger-remove',
+		className: 'btn secondary',
+		textContent: 'Trigger Remove Event',
+	})
+	const clearLogButton = createElement('button', {
+		id: 'clear-log',
+		className: 'btn danger',
+		textContent: 'Clear Log',
+	})
+	actionRow.append(triggerAddButton, triggerSetButton, triggerRemoveButton, clearLogButton)
+
+	// Log content
+	const logContent = createElement('div', {
+		id: 'event-log-content',
+		className: 'event-log',
+	})
+	const logPlaceholder = createElement('p', {
+		className: 'placeholder',
+		textContent: 'No events yet. Make some changes!',
+	})
+	logContent.appendChild(logPlaceholder)
+
+	section.append(h2, subtitle, infoBox, actionRow, logContent)
+	content.appendChild(section)
+
+	// Store element references
+	eventsElements = {
+		triggerAddButton,
+		triggerSetButton,
+		triggerRemoveButton,
+		clearLogButton,
+		logContent,
+	}
+
+	// Attach handlers and update UI
+	attachEventHandlers()
+	updateEventLogUI()
 }
 
 // ============================================================================
 // Data Loading Functions
 // ============================================================================
 
+function createTodoElement(todo: Todo): HTMLDivElement {
+	const item = createElement('div', {
+		className: `todo-item ${todo.completed ? 'completed' : ''}`,
+		dataset: { id: todo.id },
+	})
+
+	const checkbox = createElement('input', { type: 'checkbox' })
+	checkbox.className = 'todo-toggle'
+	checkbox.checked = todo.completed
+
+	const priority = createElement('span', {
+		className: 'priority',
+		textContent: getPriorityEmoji(todo.priority),
+	})
+
+	const title = createElement('span', {
+		className: 'todo-title',
+		textContent: todo.title,
+	})
+
+	const date = createElement('span', {
+		className: 'todo-date',
+		textContent: formatTime(todo.createdAt),
+	})
+
+	const deleteBtn = createElement('button', {
+		className: 'delete-btn',
+		textContent: '×',
+	})
+	deleteBtn.title = 'Delete'
+
+	item.append(checkbox, priority, title, date, deleteBtn)
+	return item
+}
+
 async function loadTodos(filter: 'all' | 'active' | 'completed' = 'all'): Promise<void> {
-	const listEl = document.getElementById('todo-list')
-	const statsEl = document.getElementById('todo-stats')
-	if (!listEl) return
+	if (!todoElements) return
+
+	const { listContainer, stats } = todoElements
 
 	try {
 		const allTodos = await db.store('todos').all()
@@ -374,58 +804,98 @@ async function loadTodos(filter: 'all' | 'active' | 'completed' = 'all'): Promis
 		// Sort by createdAt descending
 		const sorted = [...todos].sort((a, b) => b.createdAt - a.createdAt)
 
+		// Clear container
+		listContainer.innerHTML = ''
+
 		if (sorted.length === 0) {
-			listEl.innerHTML = `<p class="empty">${filter === 'all' ? 'No todos yet. Add one above or load samples!' : `No ${filter} todos.`}</p>`
+			const empty = createElement('p', {
+				className: 'empty',
+				textContent: filter === 'all' ? 'No todos yet. Add one above or load samples!' : `No ${filter} todos.`,
+			})
+			listContainer.appendChild(empty)
 		} else {
-			listEl.innerHTML = sorted.map((todo) => `
-				<div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
-					<input type="checkbox" ${todo.completed ? 'checked' : ''} class="todo-toggle" />
-					<span class="priority">${getPriorityEmoji(todo.priority)}</span>
-					<span class="todo-title">${escapeHtml(todo.title)}</span>
-					<span class="todo-date">${formatTime(todo.createdAt)}</span>
-					<button class="delete-btn" title="Delete">×</button>
-				</div>
-			`).join('')
+			sorted.forEach(todo => {
+				listContainer.appendChild(createTodoElement(todo))
+			})
 		}
 
 		// Update stats
 		const completed = allTodos.filter((t) => t.completed).length
-		if (statsEl) {
-			statsEl.innerHTML = `
-				<span>📊 Total: <strong>${allTodos.length}</strong></span>
-				<span>✅ Completed: <strong>${completed}</strong></span>
-				<span>⏳ Active: <strong>${allTodos.length - completed}</strong></span>
-			`
-		}
+		stats.innerHTML = ''
+
+		const totalSpan = createElement('span')
+		totalSpan.innerHTML = '📊 Total: <strong>' + allTodos.length + '</strong>'
+		const completedSpan = createElement('span')
+		completedSpan.innerHTML = '✅ Completed: <strong>' + completed + '</strong>'
+		const activeSpan = createElement('span')
+		activeSpan.innerHTML = '⏳ Active: <strong>' + (allTodos.length - completed) + '</strong>'
+
+		stats.append(totalSpan, completedSpan, activeSpan)
 	} catch (error) {
-		listEl.innerHTML = `<p class="error">Error loading todos: ${String(error)}</p>`
+		listContainer.innerHTML = ''
+		const errorP = createElement('p', {
+			className: 'error',
+			textContent: `Error loading todos: ${String(error)}`,
+		})
+		listContainer.appendChild(errorP)
 	}
 }
 
+function createNoteCard(note: Note): HTMLDivElement {
+	const card = createElement('div', {
+		className: 'note-card',
+		dataset: { id: note.id },
+	})
+	card.style.backgroundColor = note.color
+
+	const h3 = createElement('h3', { textContent: note.title })
+	const p = createElement('p', { textContent: note.content })
+
+	const footer = createElement('div', { className: 'note-footer' })
+	const timestamp = createElement('span', {
+		textContent: formatTime(note.updatedAt),
+	})
+	const deleteBtn = createElement('button', {
+		className: 'delete-note-btn',
+		textContent: '×',
+	})
+	deleteBtn.title = 'Delete'
+	footer.append(timestamp, deleteBtn)
+
+	card.append(h3, p, footer)
+	return card
+}
+
 async function loadNotes(): Promise<void> {
-	const gridEl = document.getElementById('notes-grid')
-	if (!gridEl) return
+	if (!noteElements) return
+
+	const { grid } = noteElements
 
 	try {
 		const notes = await db.store('notes').all()
 		const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt)
 
+		// Clear grid
+		grid.innerHTML = ''
+
 		if (sorted.length === 0) {
-			gridEl.innerHTML = '<p class="empty">No notes yet. Add one above or load samples!</p>'
+			const empty = createElement('p', {
+				className: 'empty',
+				textContent: 'No notes yet. Add one above or load samples!',
+			})
+			grid.appendChild(empty)
 		} else {
-			gridEl.innerHTML = sorted.map((note) => `
-				<div class="note-card" style="background-color: ${note.color}" data-id="${note.id}">
-					<h3>${escapeHtml(note.title)}</h3>
-					<p>${escapeHtml(note.content)}</p>
-					<div class="note-footer">
-						<span>${formatTime(note.updatedAt)}</span>
-						<button class="delete-note-btn" title="Delete">×</button>
-					</div>
-				</div>
-			`).join('')
+			sorted.forEach(note => {
+				grid.appendChild(createNoteCard(note))
+			})
 		}
 	} catch (error) {
-		gridEl.innerHTML = `<p class="error">Error loading notes: ${String(error)}</p>`
+		grid.innerHTML = ''
+		const errorP = createElement('p', {
+			className: 'error',
+			textContent: `Error loading notes: ${String(error)}`,
+		})
+		grid.appendChild(errorP)
 	}
 }
 
@@ -433,40 +903,24 @@ async function loadNotes(): Promise<void> {
 // Event Handlers
 // ============================================================================
 
-function attachEventListeners(): void {
-	// Tab navigation
-	document.querySelectorAll('.tab').forEach((tab) => {
-		tab.addEventListener('click', (e) => {
-			const target = e.currentTarget as HTMLElement
-			activeTab = target.dataset.tab as typeof activeTab
-			render()
-		})
-	})
-
-	// Tab-specific handlers
-	switch (activeTab) {
-		case 'todos':
-			attachTodoHandlers()
-			break
-		case 'notes':
-			attachNoteHandlers()
-			break
-		case 'query':
-			attachQueryHandlers()
-			break
-		case 'events':
-			attachEventHandlers()
-			updateEventLogUI()
-			break
-	}
-}
-
 function attachTodoHandlers(): void {
+	if (!todoElements) return
+
+	const {
+		titleInput,
+		prioritySelect,
+		addButton,
+		loadSamplesButton,
+		clearCompletedButton,
+		clearAllButton,
+		filterAllButton,
+		filterActiveButton,
+		filterCompletedButton,
+		listContainer,
+	} = todoElements
+
 	// Add todos
 	const addTodo = async(): Promise<void> => {
-		const titleInput = document.getElementById('todo-title') as HTMLInputElement
-		const prioritySelect = document.getElementById('todo-priority') as HTMLSelectElement
-
 		const title = titleInput.value.trim()
 		if (!title) return
 
@@ -482,72 +936,99 @@ function attachTodoHandlers(): void {
 		void loadTodos()
 	}
 
-	document.getElementById('add-todo')?.addEventListener('click', () => void addTodo())
-	document.getElementById('todo-title')?.addEventListener('keypress', (e) => {
+	addButton.addEventListener('click', () => void addTodo())
+	titleInput.addEventListener('keypress', (e) => {
 		if (e.key === 'Enter') void addTodo()
 	})
 
 	// Load samples
-	document.getElementById('load-samples')?.addEventListener('click', async() => {
-		await db.store('todos').set([...SAMPLE_TODOS])
-		void loadTodos()
+	loadSamplesButton.addEventListener('click', () => {
+		void (async() => {
+			await db.store('todos').set([...SAMPLE_TODOS])
+			void loadTodos()
+		})()
 	})
 
 	// Clear completed
-	document.getElementById('clear-completed')?.addEventListener('click', async() => {
-		const todos = await db.store('todos').all()
-		const completedIds = todos.filter((t) => t.completed).map((t) => t.id)
-		if (completedIds.length > 0) {
-			await db.store('todos').remove(completedIds)
-		}
-		void loadTodos()
+	clearCompletedButton.addEventListener('click', () => {
+		void (async() => {
+			const todos = await db.store('todos').all()
+			const completedIds = todos.filter((t) => t.completed).map((t) => t.id)
+			if (completedIds.length > 0) {
+				await db.store('todos').remove(completedIds)
+			}
+			void loadTodos()
+		})()
 	})
 
 	// Clear all
-	document.getElementById('clear-todos')?.addEventListener('click', async() => {
-		await db.store('todos').clear()
-		void loadTodos()
+	clearAllButton.addEventListener('click', () => {
+		void (async() => {
+			await db.store('todos').clear()
+			void loadTodos()
+		})()
 	})
 
 	// Filter buttons
-	document.querySelectorAll('.filter-btn').forEach((btn) => {
-		btn.addEventListener('click', (e) => {
-			const target = e.currentTarget as HTMLElement
-			document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'))
-			target.classList.add('active')
-			void loadTodos(target.dataset.filter as 'all' | 'active' | 'completed')
-		})
+	const setActiveFilter = (button: HTMLButtonElement) => {
+		filterAllButton.classList.remove('active')
+		filterActiveButton.classList.remove('active')
+		filterCompletedButton.classList.remove('active')
+		button.classList.add('active')
+	}
+
+	filterAllButton.addEventListener('click', () => {
+		setActiveFilter(filterAllButton)
+		void loadTodos('all')
+	})
+	filterActiveButton.addEventListener('click', () => {
+		setActiveFilter(filterActiveButton)
+		void loadTodos('active')
+	})
+	filterCompletedButton.addEventListener('click', () => {
+		setActiveFilter(filterCompletedButton)
+		void loadTodos('completed')
 	})
 
 	// Toggle and delete (event delegation)
-	document.getElementById('todo-list')?.addEventListener('click', async(e) => {
+	listContainer.addEventListener('click', (e) => {
 		const target = e.target as HTMLElement
-		const todoItem = target.closest('.todo-item')
+		const todoItem = target.closest<HTMLDivElement>('.todo-item')
 		if (!todoItem) return
 
 		const id = todoItem.dataset.id
 		if (!id) return
 
-		if (target.classList.contains('todo-toggle')) {
-			const todo = await db.store('todos').get(id)
-			if (todo) {
-				await db.store('todos').set({ ...todo, completed: !todo.completed })
+		void (async() => {
+			if (target.classList.contains('todo-toggle')) {
+				const todo = await db.store('todos').get(id)
+				if (todo) {
+					await db.store('todos').set({ ...todo, completed: !todo.completed })
+					void loadTodos()
+				}
+			} else if (target.classList.contains('delete-btn')) {
+				await db.store('todos').remove(id)
 				void loadTodos()
 			}
-		} else if (target.classList.contains('delete-btn')) {
-			await db.store('todos').remove(id)
-			void loadTodos()
-		}
+		})()
 	})
 }
 
 function attachNoteHandlers(): void {
+	if (!noteElements) return
+
+	const {
+		titleInput,
+		contentInput,
+		colorSelect,
+		addButton,
+		loadSamplesButton,
+		clearAllButton,
+		grid,
+	} = noteElements
+
 	// Add note
 	const addNote = async(): Promise<void> => {
-		const titleInput = document.getElementById('note-title') as HTMLInputElement
-		const contentInput = document.getElementById('note-content') as HTMLInputElement
-		const colorSelect = document.getElementById('note-color') as HTMLSelectElement
-
 		const title = titleInput.value.trim() || 'Untitled'
 		const content = contentInput.value.trim() || ''
 
@@ -564,47 +1045,101 @@ function attachNoteHandlers(): void {
 		void loadNotes()
 	}
 
-	document.getElementById('add-note')?.addEventListener('click', () => void addNote())
+	addButton.addEventListener('click', () => void addNote())
 
 	// Load sample notes (batch operation)
-	document.getElementById('load-sample-notes')?.addEventListener('click', async() => {
-		// Batch operation - single transaction
-		await db.store('notes').set([...SAMPLE_NOTES])
-		void loadNotes()
+	loadSamplesButton.addEventListener('click', () => {
+		void (async() => {
+			await db.store('notes').set([...SAMPLE_NOTES])
+			void loadNotes()
+		})()
 	})
 
 	// Clear all notes (transaction demo)
-	document.getElementById('clear-notes')?.addEventListener('click', async() => {
-		await db.write('notes', async(tx) => {
-			await tx.store('notes').clear()
-		})
-		void loadNotes()
+	clearAllButton.addEventListener('click', () => {
+		void (async() => {
+			await db.write('notes', async(tx) => {
+				await tx.store('notes').clear()
+			})
+			void loadNotes()
+		})()
 	})
 
 	// Delete note (event delegation)
-	document.getElementById('notes-grid')?.addEventListener('click', async(e) => {
+	grid.addEventListener('click', (e) => {
 		const target = e.target as HTMLElement
 		if (!target.classList.contains('delete-note-btn')) return
 
-		const noteCard = target.closest('.note-card')
-		if (!noteCard?.dataset.id) return
+		const noteCard = target.closest<HTMLDivElement>('.note-card')
+		if (!noteCard) return
 
-		await db.store('notes').remove(noteCard.dataset.id)
-		void loadNotes()
+		const id = noteCard.dataset.id
+		if (!id) return
+
+		void (async() => {
+			await db.store('notes').remove(id)
+			void loadNotes()
+		})()
 	})
 }
 
 let currentPage = 0
 let lastQueryTotal = 0
 
-function attachQueryHandlers(): void {
-	const runQuery = async(): Promise<void> => {
-		const prioritySelect = document.getElementById('query-priority') as HTMLSelectElement
-		const statusSelect = document.getElementById('query-status') as HTMLSelectElement
-		const limitInput = document.getElementById('query-limit') as HTMLInputElement
-		const resultsEl = document.getElementById('query-results')
-		const codeEl = document.getElementById('query-code')
+function createQueryResultsTable(results: readonly Todo[]): HTMLTableElement {
+	const table = createElement('table')
 
+	const thead = createElement('thead')
+	const headerRow = createElement('tr')
+	headerRow.append(
+		createElement('th', { textContent: 'Title' }),
+		createElement('th', { textContent: 'Priority' }),
+		createElement('th', { textContent: 'Status' }),
+		createElement('th', { textContent: 'Created' }),
+	)
+	thead.appendChild(headerRow)
+
+	const tbody = createElement('tbody')
+	results.forEach((todo) => {
+		const row = createElement('tr', {
+			className: todo.completed ? 'completed' : '',
+		})
+
+		const titleCell = createElement('td', { textContent: todo.title })
+		const priorityCell = createElement('td', {
+			textContent: `${getPriorityEmoji(todo.priority)} ${todo.priority}`,
+		})
+		const statusCell = createElement('td', {
+			textContent: todo.completed ? '✅ Done' : '⏳ Active',
+		})
+		const createdCell = createElement('td', {
+			textContent: formatTime(todo.createdAt),
+		})
+
+		row.append(titleCell, priorityCell, statusCell, createdCell)
+		tbody.appendChild(row)
+	})
+
+	table.append(thead, tbody)
+	return table
+}
+
+function attachQueryHandlers(): void {
+	if (!queryElements) return
+
+	const {
+		prioritySelect,
+		statusSelect,
+		limitInput,
+		prevButton,
+		nextButton,
+		pageInfo,
+		runButton,
+		results,
+		codeBlock,
+	} = queryElements
+
+	const runQuery = async(): Promise<void> => {
 		const priority = prioritySelect.value
 		const status = statusSelect.value
 		const limit = parseInt(limitInput.value, 10) || 3
@@ -640,64 +1175,59 @@ function attachQueryHandlers(): void {
 		codeLines.push('  .toArray()')
 
 		// Execute and display
-		const results = await query.toArray()
+		const queryResults = await query.toArray()
 
-		if (resultsEl) {
-			if (results.length === 0 && currentPage === 0) {
-				resultsEl.innerHTML = '<p class="empty">No results found. Try loading sample todos first!</p>'
-			} else if (results.length === 0) {
-				resultsEl.innerHTML = '<p class="empty">No more results on this page.</p>'
-			} else {
-				resultsEl.innerHTML = `
-					<table>
-						<thead>
-							<tr>
-								<th>Title</th>
-								<th>Priority</th>
-								<th>Status</th>
-								<th>Created</th>
-							</tr>
-						</thead>
-						<tbody>
-							${results.map((todo) => `
-								<tr class="${todo.completed ? 'completed' : ''}">
-									<td>${escapeHtml(todo.title)}</td>
-									<td>${getPriorityEmoji(todo.priority)} ${todo.priority}</td>
-									<td>${todo.completed ? '✅ Done' : '⏳ Active'}</td>
-									<td>${formatTime(todo.createdAt)}</td>
-								</tr>
-							`).join('')}
-						</tbody>
-					</table>
-					<p class="result-count">Showing ${results.length} of ${lastQueryTotal} total results</p>
-				`
-			}
+		// Clear and update results
+		results.innerHTML = ''
+
+		if (queryResults.length === 0 && currentPage === 0) {
+			const empty = createElement('p', {
+				className: 'empty',
+				textContent: 'No results found. Try loading sample todos first!',
+			})
+			results.appendChild(empty)
+		} else if (queryResults.length === 0) {
+			const empty = createElement('p', {
+				className: 'empty',
+				textContent: 'No more results on this page.',
+			})
+			results.appendChild(empty)
+		} else {
+			const table = createQueryResultsTable(queryResults)
+			const resultCount = createElement('p', {
+				className: 'result-count',
+				textContent: `Showing ${queryResults.length} of ${lastQueryTotal} total results`,
+			})
+			results.append(table, resultCount)
 		}
 
 		// Update page info
-		const pageInfo = document.getElementById('page-info')
-		if (pageInfo) {
-			const totalPages = Math.ceil(lastQueryTotal / limit) || 1
-			pageInfo.textContent = `Page ${currentPage + 1} of ${totalPages}`
-		}
+		const totalPages = Math.ceil(lastQueryTotal / limit) || 1
+		pageInfo.textContent = `Page ${currentPage + 1} of ${totalPages}`
 
 		// Display generated code
-		if (codeEl) {
-			codeEl.innerHTML = `<pre><code>${codeLines.join('\n')}</code></pre>`
-		}
+		const pre = createElement('pre')
+		const code = createElement('code', {
+			textContent: codeLines.join('\n'),
+		})
+		pre.appendChild(code)
+		codeBlock.innerHTML = ''
+		codeBlock.appendChild(pre)
 	}
 
-	document.getElementById('run-query')?.addEventListener('click', () => {
+	runButton.addEventListener('click', () => {
 		currentPage = 0
 		void runQuery()
 	})
-	document.getElementById('prev-page')?.addEventListener('click', () => {
+
+	prevButton.addEventListener('click', () => {
 		if (currentPage > 0) {
 			currentPage--
 			void runQuery()
 		}
 	})
-	document.getElementById('next-page')?.addEventListener('click', () => {
+
+	nextButton.addEventListener('click', () => {
 		currentPage++
 		void runQuery()
 	})
@@ -707,42 +1237,57 @@ function attachQueryHandlers(): void {
 }
 
 function attachEventHandlers(): void {
-	document.getElementById('trigger-add')?.addEventListener('click', async() => {
-		await db.store('todos').add({
-			id: generateId(),
-			title: `Event Test ${new Date().toLocaleTimeString()}`,
-			completed: false,
-			priority: 'low',
-			createdAt: Date.now(),
-		})
-	})
+	if (!eventsElements) return
 
-	document.getElementById('trigger-set')?.addEventListener('click', async() => {
-		const todos = await db.store('todos').all()
-		if (todos.length > 0) {
-			const todo = todos[0]
-			if (todo) {
-				await db.store('todos').set({ ...todo, title: `Updated ${new Date().toLocaleTimeString()}` })
-			}
-		} else {
-			await db.store('todos').set({
+	const {
+		triggerAddButton,
+		triggerSetButton,
+		triggerRemoveButton,
+		clearLogButton,
+	} = eventsElements
+
+	triggerAddButton.addEventListener('click', () => {
+		void (async() => {
+			await db.store('todos').add({
 				id: generateId(),
-				title: `Set Event ${new Date().toLocaleTimeString()}`,
+				title: `Event Test ${new Date().toLocaleTimeString()}`,
 				completed: false,
-				priority: 'medium',
+				priority: 'low',
 				createdAt: Date.now(),
 			})
-		}
+		})()
 	})
 
-	document.getElementById('trigger-remove')?.addEventListener('click', async() => {
-		const todos = await db.store('todos').all()
-		if (todos.length > 0 && todos[0]) {
-			await db.store('todos').remove(todos[0].id)
-		}
+	triggerSetButton.addEventListener('click', () => {
+		void (async() => {
+			const todos = await db.store('todos').all()
+			if (todos.length > 0) {
+				const todo = todos[0]
+				if (todo) {
+					await db.store('todos').set({ ...todo, title: `Updated ${new Date().toLocaleTimeString()}` })
+				}
+			} else {
+				await db.store('todos').set({
+					id: generateId(),
+					title: `Set Event ${new Date().toLocaleTimeString()}`,
+					completed: false,
+					priority: 'medium',
+					createdAt: Date.now(),
+				})
+			}
+		})()
 	})
 
-	document.getElementById('clear-log')?.addEventListener('click', () => {
+	triggerRemoveButton.addEventListener('click', () => {
+		void (async() => {
+			const todos = await db.store('todos').all()
+			if (todos.length > 0 && todos[0]) {
+				await db.store('todos').remove(todos[0].id)
+			}
+		})()
+	})
+
+	clearLogButton.addEventListener('click', () => {
 		eventLog.length = 0
 		updateEventLogUI()
 	})
