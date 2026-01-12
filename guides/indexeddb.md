@@ -483,6 +483,28 @@ db.where('lastName').startsWith('Smith')
 db.where('role').anyOf(['admin', 'moderator', 'vip'])
 ```
 
+### Non-Indexable Types (Automatic Fallback)
+
+IndexedDB only supports certain key types: `string`, `number`, `Date`, `ArrayBuffer`, and arrays of these.
+
+**Boolean, null, undefined, and plain objects are NOT valid IndexedDB keys.**
+
+The query builder automatically handles this by falling back to post-cursor filtering:
+
+```typescript
+// Boolean values - automatically uses filter (transparent to you)
+const published = await db.store('posts').query()
+	.where('published').equals(true)  // Works! Falls back to filter
+	.toArray()
+
+// This is equivalent to:
+const published = await db.store('posts').query()
+	.filter(post => post.published === true)
+	.toArray()
+```
+
+> **Performance Note:** When using `equals()` with non-indexable types, the query scans all records. For best performance with boolean fields, consider storing them as `0`/`1` instead.
+
 ### filter() — Post-Cursor Filtering (Flexible)
 
 For conditions that cannot use indexes:

@@ -550,10 +550,9 @@ describe('Integration: CRUD', () => {
 			expect(alicePosts).toHaveLength(2)
 
 			// Get all published posts sorted by views (descending)
-			// Note: Boolean index with equals() has limitations in IDB,
-			// so we use filter for more reliable results
+			// Now works: equals(true) auto-falls back to filter for booleans
 			const publishedPosts = await db.store('posts').query()
-				.filter(p => p.published)
+				.where('published').equals(true)
 				.toArray()
 
 			const sortedByViews = [...publishedPosts].sort((a, b) => b.views - a.views)

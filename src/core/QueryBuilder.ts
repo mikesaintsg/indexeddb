@@ -15,7 +15,7 @@ import type {
 	ValidKey,
 	BetweenOptions,
 } from '../types.js'
-import { toIDBCursorDirection } from '../helpers.js'
+import { toIDBCursorDirection, isValidKey } from '../helpers.js'
 import { wrapError } from '../errors.js'
 
 /** Internal query state */
@@ -465,6 +465,10 @@ export class QueryBuilder<T> implements QueryBuilderInterface<T> {
 
 /**
  * Where Clause implementation.
+ *
+ * @remarks
+ * Handles both valid IndexedDB keys and non-indexable types (like booleans).
+ * Non-indexable types fall back to post-cursor filtering automatically.
  */
 export class WhereClause<T> implements WhereClauseInterface<T> {
 	readonly #context: QueryContext
@@ -475,10 +479,42 @@ export class WhereClause<T> implements WhereClauseInterface<T> {
 		this.#state = state
 	}
 
-	equals(value: ValidKey): QueryBuilderInterface<T> {
+	equals(value: ValidKey | boolean | null | undefined): QueryBuilderInterface<T> {
+		// Check if value is a valid IndexedDB key
+		// Booleans, undefined, null, objects, functions are NOT valid keys
+		if (!isValidKey(value)) {
+			// Fall back to filter-based comparison
+			return this.#filterByValue(value, (fieldValue: unknown) => fieldValue === value)
+		}
+
 		return new QueryBuilder<T>(this.#context, {
 			...this.#state,
 			range: IDBKeyRange.only(value),
+		})
+	}
+
+	/**
+	 * Falls back to filter-based comparison for non-indexable types.
+	 */
+	#filterByValue(
+		_matchValue: unknown,
+		predicate: (fieldValue: unknown) => boolean,
+	): QueryBuilderInterface<T> {
+		const keyPath = this.#state.keyPath
+
+		// Create a filter that extracts the field and compares
+		const filter = (item: T): boolean => {
+			if (keyPath === null || typeof item !== 'object' || item === null) {
+				return false
+			}
+			const fieldValue = (item as Record<string, unknown>)[keyPath]
+			return predicate(fieldValue)
+		}
+
+		return new QueryBuilder<T>(this.#context, {
+			...this.#state,
+			keyPath: null, // Clear keyPath since we're not using index
+			filters: [...this.#state.filters, filter],
 		})
 	}
 

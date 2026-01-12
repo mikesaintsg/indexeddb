@@ -202,6 +202,81 @@ describe('QueryBuilder', () => {
 
 			expect(results).toHaveLength(0)
 		})
+
+		it('works with boolean values (auto-fallback to filter)', async() => {
+			// Create a schema with boolean field
+			interface Item {
+				readonly id: string
+				readonly active: boolean
+			}
+			interface BoolSchema extends DatabaseSchema {
+				readonly items: Item
+			}
+			const boolDb = createDatabase<BoolSchema>({
+				name: `${dbName}-bool`,
+				version: 1,
+				stores: {
+					items: {
+						indexes: [{ name: 'byActive', keyPath: 'active' }],
+					},
+				},
+			})
+
+			await boolDb.store('items').set([
+				{ id: 'i1', active: true },
+				{ id: 'i2', active: false },
+				{ id: 'i3', active: true },
+			])
+
+			// equals(true) should work - automatically falls back to filter
+			const activeItems = await boolDb.store('items').query()
+				.where('active').equals(true)
+				.toArray()
+
+			expect(activeItems).toHaveLength(2)
+			expect(activeItems.every(item => item.active)).toBe(true)
+
+			// Test false as well
+			const inactiveItems = await boolDb.store('items').query()
+				.where('active').equals(false)
+				.toArray()
+
+			expect(inactiveItems).toHaveLength(1)
+			expect(inactiveItems[0]?.active).toBe(false)
+
+			await boolDb.drop()
+		})
+
+		it('handles null and undefined values (auto-fallback)', async() => {
+			interface NullableItem {
+				readonly id: string
+				readonly value: string | null
+			}
+			interface NullSchema extends DatabaseSchema {
+				readonly items: NullableItem
+			}
+			const nullDb = createDatabase<NullSchema>({
+				name: `${dbName}-null`,
+				version: 1,
+				stores: { items: {} },
+			})
+
+			await nullDb.store('items').set([
+				{ id: 'i1', value: 'test' },
+				{ id: 'i2', value: null },
+				{ id: 'i3', value: 'test' },
+			])
+
+			// equals(null) should work - automatically falls back to filter
+			const nullItems = await nullDb.store('items').query()
+				.where('value').equals(null)
+				.toArray()
+
+			expect(nullItems).toHaveLength(1)
+			expect(nullItems[0]?.value).toBe(null)
+
+			await nullDb.drop()
+		})
 	})
 
 	// ─── Where Clause: greaterThan ───────────────────────────
@@ -672,6 +747,109 @@ describe('QueryBuilder', () => {
 				.toArray()
 
 			expect(results).toHaveLength(2)
+		})
+
+		it('native IDBKeyRange.only rejects boolean values', () => {
+			// This demonstrates that booleans are not valid IndexedDB keys
+			expect(() => IDBKeyRange.only(true)).toThrow()
+			expect(() => IDBKeyRange.only(false)).toThrow()
+		})
+
+		it('boolean values are not stored in IndexedDB indexes', async() => {
+			// Create a schema with boolean index
+			interface Item {
+				readonly id: string
+				readonly active: boolean
+			}
+			interface BoolSchema extends DatabaseSchema {
+				readonly items: Item
+			}
+			const boolDb = createDatabase<BoolSchema>({
+				name: `${dbName}-index-test`,
+				version: 1,
+				stores: {
+					items: {
+						indexes: [{ name: 'byActive', keyPath: 'active' }],
+					},
+				},
+			})
+
+			await boolDb.store('items').set([
+				{ id: 'i1', active: true },
+				{ id: 'i2', active: false },
+				{ id: 'i3', active: true },
+			])
+
+			// Access native index and test cursor
+			const nativeDb = boolDb.native
+			const tx = nativeDb.transaction(['items'], 'readonly')
+			const store = tx.objectStore('items')
+			const index = store.index('byActive')
+
+			// Get all values from the index - should be empty because booleans are not indexable
+			const items: Item[] = []
+			await new Promise<void>((resolve, reject) => {
+				const request = index.openCursor()
+				request.onsuccess = () => {
+					const cursor = request.result
+					if (cursor) {
+						items.push(cursor.value as Item)
+						cursor.continue()
+					} else {
+						resolve()
+					}
+				}
+				request.onerror = () => reject(request.error ?? new Error('Cursor failed'))
+			})
+
+			// Boolean values don't get indexed - the index is empty!
+			expect(items).toHaveLength(0)
+
+			// But the records still exist in the store
+			const allItems = await boolDb.store('items').all()
+			expect(allItems).toHaveLength(3)
+
+			await boolDb.drop()
+		})
+
+		it('stores boolean values correctly even though not indexable', async() => {
+			interface Item {
+				readonly id: string
+				readonly active: boolean
+			}
+			interface BoolSchema extends DatabaseSchema {
+				readonly items: Item
+			}
+			const boolDb = createDatabase<BoolSchema>({
+				name: `${dbName}-store-test`,
+				version: 1,
+				stores: {
+					items: {
+						indexes: [{ name: 'byActive', keyPath: 'active' }],
+					},
+				},
+			})
+
+			await boolDb.store('items').set([
+				{ id: 'i1', active: true },
+				{ id: 'i2', active: false },
+				{ id: 'i3', active: true },
+			])
+
+			const i1 = await boolDb.store('items').get('i1')
+			const i2 = await boolDb.store('items').get('i2')
+
+			expect(i1?.active).toBe(true)
+			expect(i2?.active).toBe(false)
+
+			// Filter still works with boolean values
+			const activeItems = await boolDb.store('items').query()
+				.filter(item => item.active)
+				.toArray()
+
+			expect(activeItems).toHaveLength(2)
+
+			await boolDb.drop()
 		})
 
 		it('query builder is immutable (chaining creates new instance)', async() => {

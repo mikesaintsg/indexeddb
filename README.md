@@ -99,15 +99,17 @@ npm run dev
 
 ## Comparison
 
-| Feature          | This Library       | Dexie.js           | idb        |
-|------------------|--------------------|--------------------|------------|
-| Type safety      | ✅ Generic schemas  | ⚠️ Limited         | ⚠️ Limited |
-| Native access    | ✅ `.native`        | ❌ Hidden           | ⚠️ Exposed |
-| Query builder    | ✅ Native ops only  | ⚠️ Over-abstracted | ❌ None     |
-| Auto batching    | ✅ Yes              | ✅ Yes              | ❌ No       |
-| Cross-tab sync   | ✅ BroadcastChannel | ⚠️ Custom          | ❌ No       |
-| Bundle size      | ~5KB               | ~30KB              | ~1KB       |
-| Dependencies     | 0                  | 0                  | 0          |
+| Feature          | This Library         | Dexie.js           | idb        |
+|------------------|----------------------|--------------------|------------|
+| Type safety      | ✅ Generic schemas    | ⚠️ Limited         | ⚠️ Limited |
+| Native access    | ✅ `.native`          | ❌ Hidden           | ⚠️ Exposed |
+| Query builder    | ✅ IDBKeyRange based  | ⚠️ Over-abstracted | ❌ None     |
+| Auto batching    | ✅ Yes                | ✅ Yes              | ❌ No       |
+| Cross-tab sync   | ✅ BroadcastChannel   | ⚠️ Custom          | ❌ No       |
+| Bundle size (gz) | ~9KB                 | ~30KB              | ~1KB       |
+| Dependencies     | 0                    | 0                  | 0          |
+
+> **Note:** This library provides more features than `idb` (query builder, batching, cross-tab sync) while remaining smaller than `Dexie.js`. The full bundle is ~46KB (~9KB gzipped).
 
 ## License
 

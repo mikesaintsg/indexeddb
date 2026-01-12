@@ -522,7 +522,7 @@ function attachTodoHandlers(): void {
 	// Toggle and delete (event delegation)
 	document.getElementById('todo-list')?.addEventListener('click', async(e) => {
 		const target = e.target as HTMLElement
-		const todoItem = target.closest('.todo-item') as HTMLElement | null
+		const todoItem = target.closest('.todo-item')
 		if (!todoItem) return
 
 		const id = todoItem.dataset.id
@@ -586,7 +586,7 @@ function attachNoteHandlers(): void {
 		const target = e.target as HTMLElement
 		if (!target.classList.contains('delete-note-btn')) return
 
-		const noteCard = target.closest('.note-card') as HTMLElement | null
+		const noteCard = target.closest('.note-card')
 		if (!noteCard?.dataset.id) return
 
 		await db.store('notes').remove(noteCard.dataset.id)
@@ -754,4 +754,3 @@ function attachEventHandlers(): void {
 
 setupEventLogging()
 render()
-
