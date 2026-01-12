@@ -344,43 +344,56 @@ export interface DatabaseInterface<Schema extends DatabaseSchema>
 	// ─── Transactions ────────────────────────────────────────
 
 	/**
-	 * Execute an operation within an explicit transaction.
+	 * Execute a read-only transaction.
 	 *
-	 * @param storeNames - Stores to include in transaction scope
-	 * @param mode - Transaction mode
-	 * @param operation - Operation to execute
-	 * @param options - Transaction options
+	 * @param storeNames - Store name or array of store names
+	 * @param operation - Operation to execute within transaction
+	 *
+	 * @remarks
+	 * Use for consistent reads across multiple stores.
+	 * Single-store reads can use `store().get()` directly.
 	 *
 	 * @example
 	 * ```ts
-	 * await db.transaction(['users', 'posts'], 'readwrite', async (tx) => {
-	 *   const user = await tx. store('users').resolve('u1')
-	 *   await tx.store('posts').set({ authorId: user.id, title: 'Hello' })
+	 * await db.read(['users', 'settings'], async (tx) => {
+	 *   const user = await tx.store('users').get('u1')
+	 *   const prefs = await tx.store('settings').get('prefs')
 	 * })
 	 * ```
 	 */
-	transaction<K extends keyof Schema & string>(
-		storeNames: readonly K[],
-		mode: TransactionMode,
-		operation:  TransactionOperation<Schema, K>,
-		options?: TransactionOptions
+	read<K extends keyof Schema & string>(
+		storeNames: K | readonly K[],
+		operation: TransactionOperation<Schema, K>
 	): Promise<void>
 
 	/**
-	 * Create a readonly transaction (native escape hatch).
+	 * Execute a read-write transaction.
 	 *
-	 * @param storeNames - Store name or names
-	 * @returns Native IDBTransaction
-	 */
-	read<K extends keyof Schema & string>(storeNames: K | readonly K[]): IDBTransaction
-
-	/**
-	 * Create a readwrite transaction (native escape hatch).
+	 * @param storeNames - Store name or array of store names
+	 * @param operation - Operation to execute within transaction
+	 * @param options - Transaction options (durability hints)
 	 *
-	 * @param storeNames - Store name or names
-	 * @returns Native IDBTransaction
+	 * @remarks
+	 * Use for atomic modifications across multiple stores.
+	 * Transaction commits on success, aborts on error.
+	 *
+	 * @example
+	 * ```ts
+	 * await db.write(['users', 'posts'], async (tx) => {
+	 *   const user = await tx.store('users').resolve('u1')
+	 *   await tx.store('posts').set({
+	 *     id: crypto.randomUUID(),
+	 *     authorId: user.id,
+	 *     title: 'New Post'
+	 *   })
+	 * }, { durability: 'relaxed' })
+	 * ```
 	 */
-	write<K extends keyof Schema & string>(storeNames: K | readonly K[]): IDBTransaction
+	write<K extends keyof Schema & string>(
+		storeNames: K | readonly K[],
+		operation: TransactionOperation<Schema, K>,
+		options?: TransactionOptions
+	): Promise<void>
 
 	// ─── Lifecycle ───────────────────────────────────────────
 

@@ -111,8 +111,8 @@ request.onsuccess = () => console.log(request. result)
 const user = await db.store('users').get(key)
 
 // Need native? It's there. 
-const nativeDb = db.native           // IDBDatabase
-const nativeTx = db.read('users')    // IDBTransaction
+const nativeDb = db.native                                    // IDBDatabase
+const nativeTx = db.native.transaction(['users'], 'readonly') // IDBTransaction
 ```
 
 ### 2. Simple Return Types
@@ -304,17 +304,17 @@ interface DatabaseInterface<Schema> extends DatabaseSubscriptions {
 	// Store access
 	store<K extends keyof Schema & string>(name: K): StoreInterface<Schema[K]>
 
-	// Transactions
-	transaction<K extends keyof Schema & string>(
-		storeNames: readonly K[],
-		mode: TransactionMode,
-		operation:  (tx: TransactionInterface<Schema, K>) => Promise<void> | void,
-		options?: TransactionOptions
+	// Transactions (no magic strings!)
+	read<K extends keyof Schema & string>(
+		storeNames: K | readonly K[],
+		operation: (tx: TransactionInterface<Schema, K>) => Promise<void> | void
 	): Promise<void>
 
-	// Transaction shortcuts (return native for advanced use)
-	read<K extends keyof Schema & string>(storeNames: K | readonly K[]): IDBTransaction
-	write<K extends keyof Schema & string>(storeNames:  K | readonly K[]): IDBTransaction
+	write<K extends keyof Schema & string>(
+		storeNames: K | readonly K[],
+		operation: (tx: TransactionInterface<Schema, K>) => Promise<void> | void,
+		options?: TransactionOptions
+	): Promise<void>
 
 	// Lifecycle
 	close(): void
@@ -328,16 +328,22 @@ interface DatabaseInterface<Schema> extends DatabaseSubscriptions {
 // Access store
 const userStore = db.store('users')
 
-// Explicit transaction for multi-store operations
-await db.transaction(['users', 'posts'], 'readwrite', async (tx) => {
-	const user = await tx.store('users').resolve('u1')
-	await tx.store('posts').set({ ... post, authorId: user.id })
+// Read transaction for consistent multi-store reads
+await db.read(['users', 'settings'], async (tx) => {
+	const user = await tx.store('users').get('u1')
+	const settings = await tx.store('settings').get('prefs')
 })
 
-// Native transaction for advanced patterns
-const tx = db.write('users')
-const store = tx.objectStore('users')
-// ...  use native APIs
+// Write transaction for multi-store atomic operations
+await db.write(['users', 'posts'], async (tx) => {
+	const user = await tx.store('users').resolve('u1')
+	await tx.store('posts').set({ ...post, authorId: user.id })
+}, { durability: 'relaxed' })
+
+// Native access for advanced patterns
+const nativeTx = db.native.transaction(['users'], 'readonly')
+const store = nativeTx.objectStore('users')
+// ... use native APIs
 ```
 
 ---
@@ -501,7 +507,7 @@ interface TransactionInterface<Schema, K extends keyof Schema> {
 **Usage:**
 
 ```typescript
-await db.transaction(['users', 'posts'], 'readwrite', async (tx) => {
+await db.write(['users', 'posts'], async (tx) => {
 	// All operations share one transaction
 	const user = await tx.store('users').resolve('u1')
 	
@@ -551,7 +557,7 @@ interface CursorInterface<T> {
 **Usage (manual cursor for mutation):**
 
 ```typescript
-await db.transaction(['users'], 'readwrite', async (tx) => {
+await db.write(['users'], async (tx) => {
 	let cursor = await tx.store('users').openCursor()
 	
 	while (cursor) {
@@ -931,7 +937,7 @@ for await (const user of store.iterate()) {
 ### 4. Transaction Durability Hints
 
 ```typescript
-await db.transaction(['users'], 'readwrite', async (tx) => {
+await db.write(['users'], async (tx) => {
 	await tx.store('users').set(user)
 }, { durability: 'relaxed' })  // Faster writes (Chrome)
 ```
