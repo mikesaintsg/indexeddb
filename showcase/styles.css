@@ -658,7 +658,17 @@ input[type="number"] {
 .example-desc {
 	font-size: 0.85rem;
 	color: var(--text-muted);
+	margin: 0 0 8px 0;
+}
+
+.example-usecase {
+	font-size: 0.85rem;
+	color: #1e40af;
+	background: #dbeafe;
+	padding: 8px 12px;
+	border-radius: var(--radius);
 	margin: 0;
+	border-left: 3px solid var(--primary);
 }
 
 .example-result {

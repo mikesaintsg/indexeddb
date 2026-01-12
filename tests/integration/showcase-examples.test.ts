@@ -922,4 +922,368 @@ describe('Integration: Showcase Examples', () => {
 			})
 		})
 	})
+
+	// ─── Edge Cases and Advanced Scenarios ───────────────────
+
+	describe('Edge Cases', () => {
+		beforeEach(async() => {
+			await db.store('users').set([...SAMPLE_USERS])
+		})
+
+		describe('Empty Operations', () => {
+			it('get() with empty array returns empty array', async() => {
+				const emptyKeys: readonly string[] = []
+				const results = await db.store('users').get(emptyKeys)
+				expect(results).toHaveLength(0)
+			})
+
+			it('set() with empty array returns empty array', async() => {
+				const keys = await db.store('users').set([])
+				expect(keys).toHaveLength(0)
+			})
+
+			it('remove() with empty array succeeds silently', async() => {
+				const emptyKeys: readonly string[] = []
+				await expect(db.store('users').remove(emptyKeys)).resolves.not.toThrow()
+			})
+
+			it('has() with empty array returns empty array', async() => {
+				const emptyKeys: readonly string[] = []
+				const results = await db.store('users').has(emptyKeys)
+				expect(results).toHaveLength(0)
+			})
+
+			it('query with no matches returns empty array', async() => {
+				const results = await db.store('users').query()
+					.where('byStatus').equals('pending')
+					.toArray()
+				expect(results).toHaveLength(0)
+			})
+		})
+
+		describe('Special Characters in Data', () => {
+			it('handles unicode characters in string fields', async() => {
+				const unicodeUser = createUser({
+					id: 'unicode-user',
+					name: '日本語 🎉 Émojis & Spëcial',
+					email: 'unicode@example.com',
+				})
+				await db.store('users').set(unicodeUser)
+				const retrieved = await db.store('users').get('unicode-user')
+				expect(retrieved?.name).toBe('日本語 🎉 Émojis & Spëcial')
+			})
+
+			it('handles empty string keys', async() => {
+				const emptyKeyUser = createUser({ id: 'empty-string-test' })
+				await db.store('users').set(emptyKeyUser)
+				const retrieved = await db.store('users').get('empty-string-test')
+				expect(retrieved?.id).toBe('empty-string-test')
+			})
+
+			it('handles very long string values', async() => {
+				const longString = 'x'.repeat(10000)
+				const longUser = createUser({
+					id: 'long-user',
+					name: longString,
+				})
+				await db.store('users').set(longUser)
+				const retrieved = await db.store('users').get('long-user')
+				expect(retrieved?.name.length).toBe(10000)
+			})
+		})
+
+		describe('Numeric Edge Cases', () => {
+			it('handles zero age', async() => {
+				const zeroAgeUser = createUser({ id: 'zero-age', age: 0 })
+				await db.store('users').set(zeroAgeUser)
+				const results = await db.store('users').query()
+					.where('byAge').equals(0)
+					.toArray()
+				expect(results.some(u => u.id === 'zero-age')).toBe(true)
+			})
+
+			it('handles negative numbers', async() => {
+				const negativeAgeUser = createUser({ id: 'negative-age', age: -1 })
+				await db.store('users').set(negativeAgeUser)
+				const results = await db.store('users').query()
+					.where('byAge').lessThan(0)
+					.toArray()
+				expect(results.some(u => u.id === 'negative-age')).toBe(true)
+			})
+
+			it('handles large numbers', async() => {
+				const largeAgeUser = createUser({ id: 'large-age', age: Number.MAX_SAFE_INTEGER })
+				await db.store('users').set(largeAgeUser)
+				const retrieved = await db.store('users').get('large-age')
+				expect(retrieved?.age).toBe(Number.MAX_SAFE_INTEGER)
+			})
+
+			it('handles decimal numbers', async() => {
+				const decimalUser = createUser({ id: 'decimal-age', age: 30.5 })
+				await db.store('users').set(decimalUser)
+				const retrieved = await db.store('users').get('decimal-age')
+				expect(retrieved?.age).toBe(30.5)
+			})
+		})
+
+		describe('Array Field Edge Cases', () => {
+			it('handles empty tags array', async() => {
+				const noTagsUser = createUser({ id: 'no-tags', tags: [] })
+				await db.store('users').set(noTagsUser)
+				const retrieved = await db.store('users').get('no-tags')
+				expect(retrieved?.tags).toHaveLength(0)
+			})
+
+			it('handles many tags with multi-entry index', async() => {
+				const manyTagsUser = createUser({
+					id: 'many-tags',
+					tags: ['tag1', 'tag2', 'tag3', 'tag4', 'tag5'],
+				})
+				await db.store('users').set(manyTagsUser)
+
+				// Each tag should be queryable
+				const tag3Results = await db.store('users').index('byTags')
+					.all(IDBKeyRange.only('tag3'))
+				expect(tag3Results.some(u => u.id === 'many-tags')).toBe(true)
+			})
+
+			it('handles duplicate tags in array', async() => {
+				const dupTagsUser = createUser({
+					id: 'dup-tags',
+					tags: ['same', 'same', 'different'],
+				})
+				await db.store('users').set(dupTagsUser)
+				const retrieved = await db.store('users').get('dup-tags')
+				expect(retrieved?.tags).toHaveLength(3)
+			})
+		})
+
+		describe('Query Builder Edge Cases', () => {
+			it('startsWith with empty string matches all', async() => {
+				const results = await db.store('users').query()
+					.where('byEmail').startsWith('')
+					.toArray()
+				expect(results.length).toBeGreaterThan(0)
+			})
+
+			it('between with same lower and upper bound', async() => {
+				const results = await db.store('users').query()
+					.where('byAge').between(32, 32)
+					.toArray()
+				expect(results.every(u => u.age === 32)).toBe(true)
+			})
+
+			it('filter with always-true predicate returns all', async() => {
+				const all = await db.store('users').all()
+				const filtered = await db.store('users').query()
+					.filter(() => true)
+					.toArray()
+				expect(filtered.length).toBe(all.length)
+			})
+
+			it('filter with always-false predicate returns empty', async() => {
+				const filtered = await db.store('users').query()
+					.filter(() => false)
+					.toArray()
+				expect(filtered).toHaveLength(0)
+			})
+
+			it('limit(0) returns empty array', async() => {
+				const results = await db.store('users').query().limit(0).toArray()
+				expect(results).toHaveLength(0)
+			})
+
+			it('offset larger than total returns empty array', async() => {
+				const results = await db.store('users').query().offset(1000).toArray()
+				expect(results).toHaveLength(0)
+			})
+
+			it('first() returns undefined for empty result', async() => {
+				const first = await db.store('users').query()
+					.where('byStatus').equals('pending')
+					.first()
+				expect(first).toBeUndefined()
+			})
+
+			it('count() returns 0 for empty result', async() => {
+				const count = await db.store('users').query()
+					.where('byStatus').equals('pending')
+					.count()
+				expect(count).toBe(0)
+			})
+		})
+
+		describe('Transaction Edge Cases', () => {
+			it('nested reads in same transaction', async() => {
+				let user1Name = ''
+				let user2Name = ''
+
+				await db.read('users', async(tx) => {
+					const user1 = await tx.store('users').get('u1')
+					const user2 = await tx.store('users').get('u2')
+					user1Name = user1?.name ?? ''
+					user2Name = user2?.name ?? ''
+				})
+
+				expect(user1Name).toBe('Alice Johnson')
+				expect(user2Name).toBe('Bob Smith')
+			})
+
+			it('multiple writes in same transaction are atomic', async() => {
+				await db.write('users', async(tx) => {
+					await tx.store('users').set(createUser({ id: 'atomic-1' }))
+					await tx.store('users').set(createUser({ id: 'atomic-2' }))
+					await tx.store('users').set(createUser({ id: 'atomic-3' }))
+				})
+
+				expect(await db.store('users').has('atomic-1')).toBe(true)
+				expect(await db.store('users').has('atomic-2')).toBe(true)
+				expect(await db.store('users').has('atomic-3')).toBe(true)
+			})
+
+			it('transaction with error rolls back all changes', async() => {
+				const initialCount = await db.store('users').count()
+
+				try {
+					await db.write('users', async(tx) => {
+						await tx.store('users').set(createUser({ id: 'rollback-1' }))
+						await tx.store('users').set(createUser({ id: 'rollback-2' }))
+						throw new Error('Intentional failure')
+					})
+				} catch {
+					// Expected
+				}
+
+				const finalCount = await db.store('users').count()
+				expect(finalCount).toBe(initialCount)
+			})
+		})
+
+		describe('Cursor Edge Cases', () => {
+			it('iterate over empty store', async() => {
+				await db.store('settings').clear()
+				const items: Setting[] = []
+				for await (const item of db.store('settings').iterate()) {
+					items.push(item)
+				}
+				expect(items).toHaveLength(0)
+			})
+
+			it('early break from iteration', async() => {
+				let count = 0
+				for await (const _ of db.store('users').iterate()) {
+					count++
+					if (count === 2) break
+				}
+				expect(count).toBe(2)
+			})
+
+			it('openCursor on empty store returns null', async() => {
+				await db.store('settings').clear()
+				const cursor = await db.store('settings').openCursor()
+				expect(cursor).toBeNull()
+			})
+		})
+
+		describe('Index Edge Cases', () => {
+			it('unique index prevents duplicate values', async() => {
+				await expect(
+					db.store('users').add(createUser({ id: 'unique-test', email: 'alice@example.com' })),
+				).rejects.toThrow(ConstraintError)
+			})
+
+			it('non-unique index allows duplicate values', async() => {
+				const user1 = createUser({ id: 'nonunique-1', status: 'active' })
+				const user2 = createUser({ id: 'nonunique-2', status: 'active' })
+				await db.store('users').set(user1)
+				await db.store('users').set(user2)
+
+				const activeUsers = await db.store('users').index('byStatus')
+					.all(IDBKeyRange.only('active'))
+				expect(activeUsers.length).toBeGreaterThanOrEqual(2)
+			})
+
+			it('index get on non-existent value returns undefined', async() => {
+				const result = await db.store('users').index('byEmail').get('nonexistent@example.com')
+				expect(result).toBeUndefined()
+			})
+
+			it('index count returns correct count', async() => {
+				const activeCount = await db.store('users').index('byStatus').count('active')
+				expect(activeCount).toBe(4)
+			})
+		})
+
+		describe('Event Edge Cases', () => {
+			it('unsubscribe before any events is safe', async() => {
+				const unsubscribe = db.onChange(() => { /* empty */ })
+				unsubscribe()
+				// Should not throw
+				await db.store('users').set(createUser({ id: 'after-unsubscribe' }))
+			})
+
+			it('multiple subscribers receive same event', async() => {
+				let count1 = 0
+				let count2 = 0
+
+				const unsub1 = db.onChange(() => { count1++ })
+				const unsub2 = db.onChange(() => { count2++ })
+
+				await db.store('users').set(createUser({ id: 'multi-sub' }))
+				await new Promise(r => setTimeout(r, 50))
+
+				unsub1()
+				unsub2()
+
+				expect(count1).toBe(1)
+				expect(count2).toBe(1)
+			})
+
+			it('event contains correct keys for batch operations', async() => {
+				let capturedKeys: readonly unknown[] = []
+				const unsub = db.onChange((e) => {
+					if (e.storeName === 'users' && e.type === 'set') {
+						capturedKeys = e.keys
+					}
+				})
+
+				await db.store('users').set([
+					createUser({ id: 'batch-event-1' }),
+					createUser({ id: 'batch-event-2' }),
+				])
+				await new Promise(r => setTimeout(r, 50))
+
+				unsub()
+
+				expect(capturedKeys).toContain('batch-event-1')
+				expect(capturedKeys).toContain('batch-event-2')
+			})
+		})
+
+		describe('Concurrent Operations', () => {
+			it('parallel get operations', async() => {
+				const [user1, user2, user3] = await Promise.all([
+					db.store('users').get('u1'),
+					db.store('users').get('u2'),
+					db.store('users').get('u3'),
+				])
+
+				expect(user1?.name).toBe('Alice Johnson')
+				expect(user2?.name).toBe('Bob Smith')
+				expect(user3?.name).toBe('Carol White')
+			})
+
+			it('parallel count operations', async() => {
+				const [usersCount, postsCount, settingsCount] = await Promise.all([
+					db.store('users').count(),
+					db.store('posts').count(),
+					db.store('settings').count(),
+				])
+
+				expect(usersCount).toBe(5)
+				expect(postsCount).toBe(0)
+				expect(settingsCount).toBe(0)
+			})
+		})
+	})
 })
