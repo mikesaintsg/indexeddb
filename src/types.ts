@@ -1387,3 +1387,12 @@ export interface WhereClauseInterface<T> {
 export type CreateDatabase = <Schema extends DatabaseSchema>(
 	options: DatabaseOptions<Schema>
 ) => Promise<DatabaseInterface<Schema>>
+
+/**
+ * Creates a deferred promise with external resolve/reject.
+ */
+export interface Deferred<T> {
+	promise: Promise<T>
+	resolve: (value: T) => void
+	reject: (reason: unknown) => void
+}

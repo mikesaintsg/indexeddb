@@ -1,0 +1,390 @@
+/**
+ * Store implementation
+ *
+ * @remarks
+ * Implements StoreInterface with automatic transaction management.
+ * Each operation creates its own transaction for atomic execution.
+ *
+ * @packageDocumentation
+ */
+
+import type {
+	ChangeEvent,
+	CursorInterface,
+	CursorOptions,
+	DatabaseSchema,
+	IndexInterface,
+	IterateOptions,
+	KeyCursorInterface,
+	KeyPath,
+	QueryBuilderInterface,
+	StoreDefinition,
+	StoreInterface,
+	Unsubscribe,
+	ValidKey,
+} from '../types.js'
+import type { Database } from './Database.js'
+import { NotFoundError, wrapError } from '../errors.js'
+import { DEFAULT_AUTO_INCREMENT, DEFAULT_KEY_PATH, ERROR_MESSAGES } from '../constants.js'
+import { toIDBCursorDirection } from '../helpers.js'
+import { Index } from './Index.js'
+import { Cursor } from './Cursor.js'
+import { KeyCursor } from './KeyCursor.js'
+
+/**
+ * Object store implementation.
+ */
+export class Store<T> implements StoreInterface<T> {
+	readonly #database: Database<DatabaseSchema>
+	readonly #name: string
+	readonly #definition: StoreDefinition
+	readonly #changeListeners = new Set<(event: ChangeEvent) => void>()
+
+	constructor(database: Database<DatabaseSchema>, name: string, definition: StoreDefinition) {
+		this.#database = database
+		this.#name = name
+		this.#definition = definition
+	}
+
+	// ─── Native Access ───────────────────────────────────────
+
+	get native(): IDBObjectStore {
+		throw new Error(ERROR_MESSAGES.NATIVE_ACCESS_NO_TRANSACTION)
+	}
+
+	// ─── Accessors ───────────────────────────────────────────
+
+	getName(): string {
+		return this.#name
+	}
+
+	getKeyPath(): KeyPath | null {
+		if (this.#definition.keyPath === undefined) return DEFAULT_KEY_PATH
+		return this.#definition.keyPath
+	}
+
+	getIndexNames(): readonly string[] {
+		return (this.#definition.indexes ?? []).map(idx => idx.name)
+	}
+
+	hasAutoIncrement(): boolean {
+		return this.#definition.autoIncrement ?? DEFAULT_AUTO_INCREMENT
+	}
+
+	// ─── Get ─────────────────────────────────────────────────
+
+	get(key: ValidKey): Promise<T | undefined>
+	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
+	async get(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<T | undefined | readonly (T | undefined)[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		if (Array.isArray(keyOrKeys)) {
+			return await Promise.all(
+				keyOrKeys.map(k => this.#request(store.get(k)) as Promise<T | undefined>),
+			)
+		}
+
+		return this.#request(store.get(keyOrKeys as IDBValidKey)) as Promise<T | undefined>
+	}
+
+	// ─── Resolve ─────────────────────────────────────────────
+
+	resolve(key: ValidKey): Promise<T>
+	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
+	async resolve(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<T | readonly T[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		if (Array.isArray(keyOrKeys)) {
+			return await Promise.all(
+				keyOrKeys.map(async k => {
+					const result = await (this.#request(store.get(k)) as Promise<T | undefined>)
+					if (result === undefined) throw new NotFoundError(this.#name, k)
+					return result
+				}),
+			)
+		}
+
+		const result = await (this.#request(store.get(keyOrKeys as IDBValidKey)) as Promise<T | undefined>)
+		if (result === undefined) throw new NotFoundError(this.#name, keyOrKeys as IDBValidKey)
+		return result
+	}
+
+	// ─── Has ─────────────────────────────────────────────────
+
+	has(key: ValidKey): Promise<boolean>
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+	async has(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<boolean | readonly boolean[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		if (Array.isArray(keyOrKeys)) {
+			return await Promise.all(
+				keyOrKeys.map(async k => {
+					const count = await this.#request(store.count(k))
+					return count > 0
+				}),
+			)
+		}
+
+		const count = await this.#request(store.count(keyOrKeys as IDBValidKey))
+		return count > 0
+	}
+
+	// ─── Set ─────────────────────────────────────────────────
+
+	set(value: T, key?: ValidKey): Promise<ValidKey>
+	set(values: readonly T[]): Promise<readonly ValidKey[]>
+	async set(valueOrValues: T | readonly T[], key?: ValidKey): Promise<ValidKey | readonly ValidKey[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readwrite')
+		const store = tx.objectStore(this.#name)
+
+		if (Array.isArray(valueOrValues)) {
+			const keys = await Promise.all(
+				valueOrValues.map(v => this.#request(store.put(v))),
+			)
+			await this.#awaitTransaction(tx)
+			this.#emitChange('set', keys)
+			return keys as readonly ValidKey[]
+		}
+
+		const resultKey = await this.#request(store.put(valueOrValues, key))
+		await this.#awaitTransaction(tx)
+		this.#emitChange('set', [resultKey])
+		return resultKey
+	}
+
+	// ─── Add ─────────────────────────────────────────────────
+
+	add(value: T, key?: ValidKey): Promise<ValidKey>
+	add(values: readonly T[]): Promise<readonly ValidKey[]>
+	async add(valueOrValues: T | readonly T[], key?: ValidKey): Promise<ValidKey | readonly ValidKey[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readwrite')
+		const store = tx.objectStore(this.#name)
+
+		if (Array.isArray(valueOrValues)) {
+			const keys = await Promise.all(
+				valueOrValues.map(v => this.#request(store.add(v))),
+			)
+			await this.#awaitTransaction(tx)
+			this.#emitChange('add', keys)
+			return keys as readonly ValidKey[]
+		}
+
+		const resultKey = await this.#request(store.add(valueOrValues, key))
+		await this.#awaitTransaction(tx)
+		this.#emitChange('add', [resultKey])
+		return resultKey
+	}
+
+	// ─── Remove ──────────────────────────────────────────────
+
+	remove(key: ValidKey): Promise<void>
+	remove(keys: readonly ValidKey[]): Promise<void>
+	async remove(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<void> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readwrite')
+		const store = tx.objectStore(this.#name)
+
+		if (Array.isArray(keyOrKeys)) {
+			await Promise.all(
+				keyOrKeys.map(k => this.#request(store.delete(k))),
+			)
+			await this.#awaitTransaction(tx)
+			this.#emitChange('remove', keyOrKeys.map(k => k))
+			return
+		}
+
+		await this.#request(store.delete(keyOrKeys as IDBValidKey))
+		await this.#awaitTransaction(tx)
+		this.#emitChange('remove', [keyOrKeys as ValidKey])
+	}
+
+	// ─── Bulk Operations ─────────────────────────────────────
+
+	async all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+		return this.#request(store.getAll(query ?? undefined, count)) as Promise<readonly T[]>
+	}
+
+	async keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+		return this.#request(store.getAllKeys(query ?? undefined, count)) as Promise<readonly ValidKey[]>
+	}
+
+	async clear(): Promise<void> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readwrite')
+		const store = tx.objectStore(this.#name)
+		await this.#request(store.clear())
+		await this.#awaitTransaction(tx)
+		this.#emitChange('clear', [])
+	}
+
+	async count(query?: IDBKeyRange | ValidKey | null): Promise<number> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+		return this.#request(store.count(query as IDBValidKey | IDBKeyRange | undefined))
+	}
+
+	// ─── Index Access ────────────────────────────────────────
+
+	index(name: string): IndexInterface<T> {
+		// Verify index exists in definition
+		const indexes = this.#definition.indexes ?? []
+		const indexDef = indexes.find(idx => idx.name === name)
+		if (!indexDef) {
+			throw new Error(`Index "${name}" not found on store "${this.#name}"`)
+		}
+
+		return new Index<T>(
+			this.#name,
+			name,
+			indexDef,
+			() => this.#database.ensureOpen(),
+		)
+	}
+
+	// ─── Query Builder ───────────────────────────────────────
+
+	query(): QueryBuilderInterface<T> {
+		// TODO: Phase 5 - Implement query builder
+		// QueryBuilderInterface provides: where, orderBy, limit, offset, filter, toArray, first, count
+		// where() returns WhereClauseInterface with: equals, notEquals, above, below, between, startsWith, anyOf
+		throw new Error('Query builder not yet implemented. Coming in Phase 5.')
+	}
+
+	// ─── Iteration ───────────────────────────────────────────
+
+	async *iterate(options?: IterateOptions): AsyncGenerator<T, void, unknown> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		const direction = toIDBCursorDirection(options?.direction)
+		const request = store.openCursor(
+			options?.query as IDBKeyRange | IDBValidKey | null ?? null,
+			direction,
+		)
+
+		let cursor = await this.#request(request)
+
+		while (cursor) {
+			yield cursor.value as T
+
+			// Advance cursor
+			const nextPromise = new Promise<IDBCursorWithValue | null>((resolve) => {
+				request.onsuccess = () => resolve(request.result)
+			})
+			cursor.continue()
+			cursor = await nextPromise
+		}
+	}
+
+	async *iterateKeys(options?: IterateOptions): AsyncGenerator<ValidKey, void, unknown> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		const direction = toIDBCursorDirection(options?.direction)
+		const request = store.openKeyCursor(
+			options?.query as IDBKeyRange | IDBValidKey | null ?? null,
+			direction,
+		)
+
+		let cursor = await this.#request(request)
+
+		while (cursor) {
+			yield cursor.key
+
+			// Advance cursor
+			const nextPromise = new Promise<IDBCursor | null>((resolve) => {
+				request.onsuccess = () => resolve(request.result)
+			})
+			cursor.continue()
+			cursor = await nextPromise
+		}
+	}
+
+	// ─── Cursors ─────────────────────────────────────────────
+
+	async openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		const direction = toIDBCursorDirection(options?.direction)
+		const request = store.openCursor(
+			options?.query as IDBKeyRange | IDBValidKey | null ?? null,
+			direction,
+		)
+
+		const cursor = await this.#request(request)
+		return cursor ? new Cursor<T>(cursor, request) : null
+	}
+
+	async openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null> {
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+
+		const direction = toIDBCursorDirection(options?.direction)
+		const request = store.openKeyCursor(
+			options?.query as IDBKeyRange | IDBValidKey | null ?? null,
+			direction,
+		)
+
+		const cursor = await this.#request(request)
+		return cursor ? new KeyCursor(cursor, request) : null
+	}
+
+	// ─── Subscriptions ───────────────────────────────────────
+
+	onChange(callback: (event: ChangeEvent) => void): Unsubscribe {
+		this.#changeListeners.add(callback)
+		return () => this.#changeListeners.delete(callback)
+	}
+
+	// ─── Private Helpers ─────────────────────────────────────
+
+	#request<R>(request: IDBRequest<R>): Promise<R> {
+		return new Promise((resolve, reject) => {
+			request.onsuccess = () => resolve(request.result)
+			request.onerror = () => reject(wrapError(request.error, { storeName: this.#name }))
+		})
+	}
+
+	#awaitTransaction(tx: IDBTransaction): Promise<void> {
+		return new Promise((resolve, reject) => {
+			tx.oncomplete = () => resolve()
+			tx.onerror = () => reject(wrapError(tx.error))
+			tx.onabort = () => reject(wrapError(tx.error))
+		})
+	}
+
+	#emitChange(type: ChangeEvent['type'], keys: readonly ValidKey[]): void {
+		const event: ChangeEvent = {
+			storeName: this.#name,
+			type,
+			keys,
+			source: 'local',
+		}
+
+		for (const callback of this.#changeListeners) {
+			try { callback(event) } catch { /* ignore */ }
+		}
+
+		this.#database.emitChange(event)
+	}
+}

@@ -59,8 +59,8 @@ const db = await createDatabase<AppSchema>({
 })
 
 // Simple operations
-const user = await db. store('users').get('u1')        // User | undefined
-const user = await db.store('users').resolve('u1')    // User (throws if missing)
+const user1 = await db. store('users').get('u1')        // User | undefined
+const user2 = await db.store('users').resolve('u1')    // User (throws if missing)
 await db.store('users').set({ id: 'u1', name: 'Alice' })
 
 // Batch operations (single transaction)
@@ -121,8 +121,8 @@ No Result wrappers. Methods return values directly or throw.
 
 ```typescript
 // ✅ Simple and direct
-const user = await store.get('u1')        // User | undefined
-const user = await store.resolve('u1')    // User (throws if missing)
+const user1 = await store.get('u1')        // User | undefined
+const user2 = await store.resolve('u1')    // User (throws if missing)
 const key = await store.set(user)         // ValidKey
 const count = await store.count()         // number
 const exists = await store.has('u1')      // boolean
@@ -164,17 +164,33 @@ await store.set([user1, user2])    // readonly ValidKey[]
 
 ```typescript
 // Default store definition
-{
+const defaultStoreDefinition = {
 	keyPath: 'id',           // Most common pattern
 	autoIncrement: false,    // Explicit IDs (UUIDs)
 	indexes: []
 }
 
-// Usage
-stores: {
-	users: {},                           // Uses defaults
-	logs: { keyPath: null, autoIncrement:  true }  // Explicit out-of-line
-}
+// Create database with defaults applied
+const db1 = await createDatabase<AppSchema>({
+	name: 'myApp1',
+	version:  1,
+	stores: {
+		users: {}, // keyPath: 'id' (default)
+		posts: {
+			indexes: [{ name: 'byAuthor', keyPath: 'authorId' }]
+		}
+	}
+})
+
+// Usage with explicit overrides
+const db2 = await createDatabase<AppSchema>({
+	name: 'myApp2',
+	version: 1,
+	stores: {
+		users: {}, // Uses defaults
+		logs: { keyPath: null, autoIncrement:  true }  // Explicit out-of-line
+	}
+})
 ```
 
 ### 6. Native Escape Hatches
@@ -413,16 +429,16 @@ interface StoreInterface<T> extends StoreSubscriptions {
 const store = db.store('users')
 
 // Simple get
-const user = await store.get('u1')
+const user1 = await store.get('u1')
 if (user) {
 	console.log(user. name)
 }
 
 // Must exist
-const user = await store.resolve('u1')  // Throws if missing
+const user2 = await store.resolve('u1')  // Throws if missing
 
 // Batch (single transaction)
-const keys = await store.set([user1, user2, user3])
+const keys = await store.set([user1, user2])
 
 // Query
 const active = await store.query()
@@ -913,7 +929,7 @@ class Database<Schema> implements DatabaseInterface<Schema> {
 Memory-efficient iteration without loading all records:
 
 ```typescript
-async *iterate(options?:  IterateOptions): AsyncGenerator<T, void, unknown> {
+async function *iterate(options?:  IterateOptions): AsyncGenerator<T, void, unknown> {
 	const tx = this.#db.transaction(this.#storeName, 'readonly')
 	const store = tx.objectStore(this.#storeName)
 	const request = store.openCursor(options?. query, options?.direction)
@@ -958,7 +974,7 @@ const results = await Promise.all(
 Query builder validates index existence and logs warnings:
 
 ```typescript
-where(keyPath: string): WhereClauseInterface<T> {
+function where(keyPath: string): WhereClauseInterface<T> {
 	if (!this.#hasIndex(keyPath) && keyPath !== this.#keyPath) {
 		console.warn(`No index for "${keyPath}" - query will scan all records`)
 	}
@@ -1024,14 +1040,18 @@ const unsub = db.onChange((event) => {
 		refreshUI()
 	}
 })
+```
 
+```typescript
 // Store level
 const unsub = db.store('users').onChange((event) => {
 	if (event.type === 'set') {
 		invalidateUserCache(event.keys)
 	}
 })
+```
 
+```typescript
 // Error events
 const unsub = db. onError((error) => {
 	reportToSentry(error)
