@@ -131,11 +131,8 @@ export class QueryBuilder<T> implements QueryBuilderInterface<T> {
 			limitCount: 1,
 		})
 
-		for await (const item of limited.iterate()) {
-			return item
-		}
-
-		return undefined
+		const result = await limited.iterate().next()
+		return result.done ? undefined : result.value
 	}
 
 	async count(): Promise<number> {

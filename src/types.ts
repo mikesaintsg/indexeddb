@@ -1270,13 +1270,27 @@ export interface WhereClauseInterface<T> {
 	/**
 	 * Match records where key equals value.
 	 *
-	 * @param value - Value to match
+	 * @param value - Value to match (any type)
 	 * @returns Query builder for chaining
 	 *
 	 * @remarks
-	 * Uses `IDBKeyRange.only(value)`.
+	 * For valid IndexedDB keys (string, number, Date, ArrayBuffer, Array),
+	 * uses `IDBKeyRange.only(value)` for optimal performance.
+	 *
+	 * For non-indexable types (boolean, null, undefined, object),
+	 * automatically falls back to post-cursor filtering.
+	 * This is less efficient but allows querying by any field type.
+	 *
+	 * @example
+	 * ```ts
+	 * // String key - uses index
+	 * query.where('status').equals('active')
+	 *
+	 * // Boolean - falls back to filter
+	 * query.where('published').equals(true)
+	 * ```
 	 */
-	equals(value: ValidKey): QueryBuilderInterface<T>
+	equals(value: ValidKey | boolean | null | undefined): QueryBuilderInterface<T>
 
 	/**
 	 * Match records where key is greater than value.
