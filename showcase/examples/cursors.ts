@@ -16,7 +16,7 @@ import type { AppSchema, ExampleResult } from './types.js'
 /**
  * Demonstrates iterate() - Async generator
  */
-export async function demonstrateIterate(db: DatabaseInterface<AppSchema>): Promise<ExampleResult> {
+export async function demonstrateCursorIterate(db: DatabaseInterface<AppSchema>): Promise<ExampleResult> {
 	const store = db.store('users')
 
 	// Simple iteration

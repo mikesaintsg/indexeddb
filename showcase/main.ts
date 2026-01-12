@@ -103,7 +103,7 @@ function getExamplesForTab(tab: TabId): readonly ExampleDefinition[] {
 				{ id: 'combined', title: 'Combined Query', description: 'where() + filter() for optimal performance', run: () => queryOps.demonstrateCombinedQuery(db) },
 				{ id: 'ordering', title: 'Ordering & Pagination', description: 'orderBy, limit, offset', run: () => queryOps.demonstrateOrderingAndPagination(db) },
 				{ id: 'terminal', title: 'Terminal Operations', description: 'toArray, first, count, keys, iterate', run: () => queryOps.demonstrateTerminalOperations(db) },
-				{ id: 'iterate', title: 'iterate()', description: 'Memory-efficient async generator', run: () => queryOps.demonstrateIterate(db) },
+				{ id: 'iterate', title: 'iterate()', description: 'Memory-efficient async generator', run: () => queryOps.demonstrateQueryIterate(db) },
 				{ id: 'boolean', title: 'Boolean Queries', description: 'Automatic fallback for non-indexable types', run: () => queryOps.demonstrateBooleanQueries(db) },
 			]
 		case 'transactions':
@@ -117,7 +117,7 @@ function getExamplesForTab(tab: TabId): readonly ExampleDefinition[] {
 			]
 		case 'cursors':
 			return [
-				{ id: 'iterate', title: 'iterate()', description: 'Async generator for records', run: () => cursorOps.demonstrateIterate(db) },
+				{ id: 'iterate', title: 'iterate()', description: 'Async generator for records', run: () => cursorOps.demonstrateCursorIterate(db) },
 				{ id: 'iteratekeys', title: 'iterateKeys()', description: 'Key-only iteration', run: () => cursorOps.demonstrateIterateKeys(db) },
 				{ id: 'manual', title: 'Manual Cursor', description: 'openCursor() for full control', run: () => cursorOps.demonstrateManualCursor(db) },
 				{ id: 'mutation', title: 'Cursor Mutation', description: 'Update and delete during iteration', run: () => cursorOps.demonstrateCursorMutation(db) },

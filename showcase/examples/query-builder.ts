@@ -364,7 +364,7 @@ for await (const record of query.iterate()) {
 /**
  * Demonstrates iterate() - Memory-efficient iteration
  */
-export async function demonstrateIterate(db: DatabaseInterface<AppSchema>): Promise<ExampleResult> {
+export async function demonstrateQueryIterate(db: DatabaseInterface<AppSchema>): Promise<ExampleResult> {
 	const store = db.store('users')
 
 	// Memory-efficient iteration
