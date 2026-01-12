@@ -107,6 +107,8 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 								await store.set(updated)
 								log(`set() - Toggled ${user.name} to ${updated.status}`, 'success')
 							}
+						}).catch((err: unknown) => {
+							log(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
 						})
 					}
 				})
@@ -118,6 +120,8 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 						void store.get(id).then(async(user) => {
 							await store.remove(id)
 							log(`remove() - Deleted ${user?.name ?? id}`, 'success')
+						}).catch((err: unknown) => {
+							log(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
 						})
 					}
 				})
@@ -565,7 +569,7 @@ export function createActivityMonitorDemo(): InteractiveDemoResult {
 					tags: [],
 					createdAt: Date.now(),
 				}
-				void store.set(newUser)
+				void store.set(newUser).catch(() => { /* ignore */ })
 			}
 
 			updateBtn.onclick = (): void => {
@@ -576,7 +580,7 @@ export function createActivityMonitorDemo(): InteractiveDemoResult {
 						const updated: User = { ...user, age: user.age + 1 }
 						await store.set(updated)
 					}
-				})
+				}).catch(() => { /* ignore */ })
 			}
 
 			deleteBtn.onclick = (): void => {
@@ -586,7 +590,7 @@ export function createActivityMonitorDemo(): InteractiveDemoResult {
 					if (user) {
 						await store.remove(user.id)
 					}
-				})
+				}).catch(() => { /* ignore */ })
 			}
 		},
 		cleanup: () => {
@@ -663,51 +667,56 @@ export function createDataExportDemo(): InteractiveDemoResult {
 				const store = db.store(storeName)
 
 				void (async() => {
-					const total = await store.count()
-					const records: unknown[] = []
-					let processed = 0
+					try {
+						const total = await store.count()
+						const records: unknown[] = []
+						let processed = 0
 
-					log(`Exporting ${total} records from "${storeName}"...`)
-					const startTime = performance.now()
+						log(`Exporting ${total} records from "${storeName}"...`)
+						const startTime = performance.now()
 
-					for await (const record of store.iterate()) {
-						records.push(record)
-						processed++
+						for await (const record of store.iterate()) {
+							records.push(record)
+							processed++
 
-						const percent = Math.round((processed / total) * 100)
-						progressFill.style.width = `${percent}%`
-						progressText.textContent = `${processed} / ${total}`
+							const percent = Math.round((processed / total) * 100)
+							progressFill.style.width = `${percent}%`
+							progressText.textContent = `${processed} / ${total}`
 
-						if (processed % 2 === 0) {
-							await new Promise(r => setTimeout(r, 30))
+							if (processed % 2 === 0) {
+								await new Promise(r => setTimeout(r, 30))
+							}
 						}
-					}
 
-					const elapsed = Math.round(performance.now() - startTime)
-					log(`Completed: ${processed} records in ${elapsed}ms`, 'success')
+						const elapsed = Math.round(performance.now() - startTime)
+						log(`Completed: ${processed} records in ${elapsed}ms`, 'success')
 
-					let output: string
-					if (format === 'json') {
-						output = JSON.stringify(records, null, 2)
-					} else {
-						if (records.length === 0) {
-							output = '(no data)'
+						let output: string
+						if (format === 'json') {
+							output = JSON.stringify(records, null, 2)
 						} else {
-							const firstRecord = records[0] as Record<string, unknown>
-							const headers = Object.keys(firstRecord)
-							const rows = records.map(r => {
-								const rec = r as Record<string, unknown>
-								return headers.map(h => JSON.stringify(rec[h] ?? '')).join(',')
-							})
-							output = [headers.join(','), ...rows].join('\n')
+							if (records.length === 0) {
+								output = '(no data)'
+							} else {
+								const firstRecord = records[0] as Record<string, unknown>
+								const headers = Object.keys(firstRecord)
+								const rows = records.map(r => {
+									const rec = r as Record<string, unknown>
+									return headers.map(h => JSON.stringify(rec[h] ?? '')).join(',')
+								})
+								output = [headers.join(','), ...rows].join('\n')
+							}
 						}
+
+						previewEl.textContent = output.length > 1500
+							? output.substring(0, 1500) + '\n... (truncated)'
+							: output
+
+						exportBtn.disabled = false
+					} catch (err) {
+						log(`Export failed: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
+						exportBtn.disabled = false
 					}
-
-					previewEl.textContent = output.length > 1500
-						? output.substring(0, 1500) + '\n... (truncated)'
-						: output
-
-					exportBtn.disabled = false
 				})()
 			}
 		},
