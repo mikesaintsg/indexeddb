@@ -27,6 +27,16 @@ import * as txOps from './examples/transactions.js'
 import * as cursorOps from './examples/cursors.js'
 import * as eventOps from './examples/events.js'
 import * as errorOps from './examples/error-handling.js'
+import type { InteractiveDemoResult } from './examples/interactive-demos.js'
+import {
+	createContactManagerDemo,
+	createUserSearchDemo,
+	createShoppingCartDemo,
+	createActivityMonitorDemo,
+	createDataExportDemo,
+	createEmailLookupDemo,
+	createRegistrationDemo,
+} from './examples/interactive-demos.js'
 
 // ============================================================================
 // App State
@@ -38,6 +48,7 @@ let db: DatabaseInterface<AppSchema>
 let activeTab: TabId = 'store'
 const eventLog: EventLogEntry[] = []
 const unsubscribes: Unsubscribe[] = []
+const demoCleanups: (() => void)[] = []
 
 // ============================================================================
 // Tab Definitions
@@ -48,16 +59,17 @@ interface TabDefinition {
 	readonly emoji: string
 	readonly label: string
 	readonly description: string
+	readonly demo?: () => InteractiveDemoResult
 }
 
 const TABS: readonly TabDefinition[] = [
-	{ id: 'store', emoji: '📦', label: 'Store Operations', description: 'CRUD: get, resolve, set, add, remove, has, all, keys, count, clear' },
-	{ id: 'index', emoji: '🔖', label: 'Index Operations', description: 'Index queries, multi-entry indexes, unique constraints' },
-	{ id: 'query', emoji: '🔍', label: 'Query Builder', description: 'where, filter, orderBy, limit, offset, terminal operations' },
-	{ id: 'transactions', emoji: '⚡', label: 'Transactions', description: 'read, write, durability, abort, multi-store atomic operations' },
-	{ id: 'cursors', emoji: '➡️', label: 'Cursors', description: 'iterate, iterateKeys, openCursor, navigation, mutation' },
-	{ id: 'events', emoji: '📡', label: 'Events', description: 'onChange, onError, cross-tab sync, version change' },
-	{ id: 'errors', emoji: '⚠️', label: 'Error Handling', description: 'Error classes, type guards, comprehensive patterns' },
+	{ id: 'store', emoji: '📦', label: 'Store Operations', description: 'CRUD: get, resolve, set, add, remove, has, all, keys, count, clear', demo: createContactManagerDemo },
+	{ id: 'index', emoji: '🔖', label: 'Index Operations', description: 'Index queries, multi-entry indexes, unique constraints', demo: createEmailLookupDemo },
+	{ id: 'query', emoji: '🔍', label: 'Query Builder', description: 'where, filter, orderBy, limit, offset, terminal operations', demo: createUserSearchDemo },
+	{ id: 'transactions', emoji: '⚡', label: 'Transactions', description: 'read, write, durability, abort, multi-store atomic operations', demo: createShoppingCartDemo },
+	{ id: 'cursors', emoji: '➡️', label: 'Cursors', description: 'iterate, iterateKeys, openCursor, navigation, mutation', demo: createDataExportDemo },
+	{ id: 'events', emoji: '📡', label: 'Events', description: 'onChange, onError, cross-tab sync, version change', demo: createActivityMonitorDemo },
+	{ id: 'errors', emoji: '⚠️', label: 'Error Handling', description: 'Error classes, type guards, comprehensive patterns', demo: createRegistrationDemo },
 ]
 
 // ============================================================================
@@ -68,7 +80,6 @@ interface ExampleDefinition {
 	readonly id: string
 	readonly title: string
 	readonly description: string
-	readonly useCase: string
 	readonly run: () => Promise<ExampleResult> | ExampleResult
 }
 
@@ -76,75 +87,75 @@ function getExamplesForTab(tab: TabId): readonly ExampleDefinition[] {
 	switch (tab) {
 		case 'store':
 			return [
-				{ id: 'get', title: 'get() - Optional Lookup', description: 'Returns undefined for missing records', useCase: '🛒 E-commerce: Check if product exists in cart before displaying quantity', run: () => storeOps.demonstrateGet(db) },
-				{ id: 'resolve', title: 'resolve() - Required Lookup', description: 'Throws NotFoundError for missing records', useCase: '👤 User Profile: Load authenticated user data - must exist or redirect to login', run: () => storeOps.demonstrateResolve(db) },
-				{ id: 'set', title: 'set() - Upsert', description: 'Insert or update records', useCase: '📝 Note-taking App: Auto-save draft - create if new, update if exists', run: () => storeOps.demonstrateSet(db) },
-				{ id: 'add', title: 'add() - Insert Only', description: 'Throws ConstraintError if key exists', useCase: '📧 Email Client: Save new message with unique ID - fail if duplicate received', run: () => storeOps.demonstrateAdd(db) },
-				{ id: 'remove', title: 'remove() - Delete', description: 'Silently succeeds for missing keys', useCase: '🗑️ Task Manager: Delete completed tasks - no error if already deleted', run: () => storeOps.demonstrateRemove(db) },
-				{ id: 'has', title: 'has() - Existence Check', description: 'Check if records exist', useCase: '🔐 Auth System: Check if session token is valid before API calls', run: () => storeOps.demonstrateHas(db) },
-				{ id: 'bulk', title: 'Bulk Operations', description: 'all(), keys(), count()', useCase: '📊 Dashboard: Show total messages count in sidebar badge', run: () => storeOps.demonstrateBulkOperations(db) },
-				{ id: 'accessors', title: 'Store Accessors', description: 'getName, getKeyPath, getIndexNames', useCase: '🔧 Dev Tools: Build dynamic query UI based on store schema', run: () => storeOps.demonstrateStoreAccessors(db) },
+				{ id: 'get', title: 'get() - Optional Lookup', description: 'Returns undefined for missing records', run: () => storeOps.demonstrateGet(db) },
+				{ id: 'resolve', title: 'resolve() - Required Lookup', description: 'Throws NotFoundError for missing records', run: () => storeOps.demonstrateResolve(db) },
+				{ id: 'set', title: 'set() - Upsert', description: 'Insert or update records', run: () => storeOps.demonstrateSet(db) },
+				{ id: 'add', title: 'add() - Insert Only', description: 'Throws ConstraintError if key exists', run: () => storeOps.demonstrateAdd(db) },
+				{ id: 'remove', title: 'remove() - Delete', description: 'Silently succeeds for missing keys', run: () => storeOps.demonstrateRemove(db) },
+				{ id: 'has', title: 'has() - Existence Check', description: 'Check if records exist', run: () => storeOps.demonstrateHas(db) },
+				{ id: 'bulk', title: 'Bulk Operations', description: 'all(), keys(), count()', run: () => storeOps.demonstrateBulkOperations(db) },
+				{ id: 'accessors', title: 'Store Accessors', description: 'getName, getKeyPath, getIndexNames', run: () => storeOps.demonstrateStoreAccessors(db) },
 			]
 		case 'index':
 			return [
-				{ id: 'accessors', title: 'Index Accessors', description: 'getName, getKeyPath, isUnique, isMultiEntry', useCase: '🔧 Admin Panel: Auto-generate filter dropdowns from index configuration', run: () => indexOps.demonstrateIndexAccessors(db) },
-				{ id: 'lookup', title: 'Index Lookup', description: 'get, resolve, getKey by index', useCase: '📧 Email App: Find user by email address for "Forgot Password" feature', run: () => indexOps.demonstrateIndexLookup(db) },
-				{ id: 'nonunique', title: 'Non-Unique Index', description: 'Query non-unique index values', useCase: '📋 Project Board: List all tasks with status "In Progress"', run: () => indexOps.demonstrateNonUniqueIndex(db) },
-				{ id: 'multientry', title: 'Multi-Entry Index', description: 'Index array elements separately', useCase: '🏷️ Blog: Find all posts tagged with "JavaScript" from tags array', run: () => indexOps.demonstrateMultiEntryIndex(db) },
-				{ id: 'range', title: 'Range Queries', description: 'Numeric range queries on index', useCase: '📅 Calendar: Find all events between two dates for week view', run: () => indexOps.demonstrateIndexRangeQueries(db) },
-				{ id: 'native', title: 'Native Access', description: 'Access native IDBIndex', useCase: '🔬 Advanced: Use raw IndexedDB API for specialized operations', run: () => indexOps.demonstrateNativeIndexAccess(db) },
+				{ id: 'accessors', title: 'Index Accessors', description: 'getName, getKeyPath, isUnique, isMultiEntry', run: () => indexOps.demonstrateIndexAccessors(db) },
+				{ id: 'lookup', title: 'Index Lookup', description: 'get, resolve, getKey by index', run: () => indexOps.demonstrateIndexLookup(db) },
+				{ id: 'nonunique', title: 'Non-Unique Index', description: 'Query non-unique index values', run: () => indexOps.demonstrateNonUniqueIndex(db) },
+				{ id: 'multientry', title: 'Multi-Entry Index', description: 'Index array elements separately', run: () => indexOps.demonstrateMultiEntryIndex(db) },
+				{ id: 'range', title: 'Range Queries', description: 'Numeric range queries on index', run: () => indexOps.demonstrateIndexRangeQueries(db) },
+				{ id: 'native', title: 'Native Access', description: 'Access native IDBIndex', run: () => indexOps.demonstrateNativeIndexAccess(db) },
 			]
 		case 'query':
 			return [
-				{ id: 'equals', title: 'where().equals()', description: 'Fast indexed equality query', useCase: '📧 Inbox: Show only unread emails using indexed status field', run: () => queryOps.demonstrateWhereEquals(db) },
-				{ id: 'comparison', title: 'Comparison Queries', description: 'greaterThan, lessThan, between', useCase: '💰 Banking: Find all transactions above $100 this month', run: () => queryOps.demonstrateComparisonQueries(db) },
-				{ id: 'startswith', title: 'startsWith()', description: 'String prefix queries', useCase: '🔍 Autocomplete: Search contacts by name as user types', run: () => queryOps.demonstrateStartsWith(db) },
-				{ id: 'anyof', title: 'anyOf()', description: 'Multiple value queries', useCase: '📋 Filter: Show tickets with priority High OR Critical', run: () => queryOps.demonstrateAnyOf(db) },
-				{ id: 'filter', title: 'filter()', description: 'Post-cursor filtering', useCase: '🎵 Music: Find songs where artist name contains search term', run: () => queryOps.demonstrateFilter(db) },
-				{ id: 'combined', title: 'Combined Query', description: 'where() + filter() for optimal performance', useCase: '🛒 Products: Active items (index) with price > $50 (filter)', run: () => queryOps.demonstrateCombinedQuery(db) },
-				{ id: 'ordering', title: 'Ordering & Pagination', description: 'orderBy, limit, offset', useCase: '📰 News Feed: Show 10 most recent articles, load more on scroll', run: () => queryOps.demonstrateOrderingAndPagination(db) },
-				{ id: 'terminal', title: 'Terminal Operations', description: 'toArray, first, count, keys, iterate', useCase: '📊 Analytics: Count active users without loading all records', run: () => queryOps.demonstrateTerminalOperations(db) },
-				{ id: 'iterate', title: 'iterate()', description: 'Memory-efficient async generator', useCase: '📁 Export: Stream 100k records to CSV without memory overflow', run: () => queryOps.demonstrateQueryIterate(db) },
-				{ id: 'boolean', title: 'Boolean Queries', description: 'Automatic fallback for non-indexable types', useCase: '✅ Todos: Filter by completed=true (auto-handled by library)', run: () => queryOps.demonstrateBooleanQueries(db) },
+				{ id: 'equals', title: 'where().equals()', description: 'Fast indexed equality query', run: () => queryOps.demonstrateWhereEquals(db) },
+				{ id: 'comparison', title: 'Comparison Queries', description: 'greaterThan, lessThan, between', run: () => queryOps.demonstrateComparisonQueries(db) },
+				{ id: 'startswith', title: 'startsWith()', description: 'String prefix queries', run: () => queryOps.demonstrateStartsWith(db) },
+				{ id: 'anyof', title: 'anyOf()', description: 'Multiple value queries', run: () => queryOps.demonstrateAnyOf(db) },
+				{ id: 'filter', title: 'filter()', description: 'Post-cursor filtering', run: () => queryOps.demonstrateFilter(db) },
+				{ id: 'combined', title: 'Combined Query', description: 'where() + filter() for optimal performance', run: () => queryOps.demonstrateCombinedQuery(db) },
+				{ id: 'ordering', title: 'Ordering & Pagination', description: 'orderBy, limit, offset', run: () => queryOps.demonstrateOrderingAndPagination(db) },
+				{ id: 'terminal', title: 'Terminal Operations', description: 'toArray, first, count, keys, iterate', run: () => queryOps.demonstrateTerminalOperations(db) },
+				{ id: 'iterate', title: 'iterate()', description: 'Memory-efficient async generator', run: () => queryOps.demonstrateQueryIterate(db) },
+				{ id: 'boolean', title: 'Boolean Queries', description: 'Automatic fallback for non-indexable types', run: () => queryOps.demonstrateBooleanQueries(db) },
 			]
 		case 'transactions':
 			return [
-				{ id: 'read', title: 'Read Transaction', description: 'Consistent reads across stores', useCase: '🧾 Invoice: Load customer + order + items atomically for display', run: () => txOps.demonstrateReadTransaction(db) },
-				{ id: 'write', title: 'Write Transaction', description: 'Atomic multi-store modifications', useCase: '💳 Checkout: Create order + decrement inventory + add payment atomically', run: () => txOps.demonstrateWriteTransaction(db) },
-				{ id: 'durability', title: 'Durability Options', description: 'default, strict, relaxed', useCase: '📝 Logging: Use relaxed for high-frequency writes, strict for payments', run: () => txOps.demonstrateDurabilityOptions(db) },
-				{ id: 'accessors', title: 'Transaction Accessors', description: 'getMode, getStoreNames, isActive', useCase: '🔧 Debugging: Log transaction details for performance monitoring', run: () => txOps.demonstrateTransactionAccessors(db) },
-				{ id: 'abort', title: 'Transaction Abort', description: 'Roll back all changes', useCase: '❌ Validation: Abort order if inventory check fails mid-transaction', run: () => txOps.demonstrateTransactionAbort(db) },
-				{ id: 'native', title: 'Native Access', description: 'Access native IDBTransaction', useCase: '🔬 Advanced: Direct IndexedDB access for complex operations', run: () => txOps.demonstrateNativeTransactionAccess(db) },
+				{ id: 'read', title: 'Read Transaction', description: 'Consistent reads across stores', run: () => txOps.demonstrateReadTransaction(db) },
+				{ id: 'write', title: 'Write Transaction', description: 'Atomic multi-store modifications', run: () => txOps.demonstrateWriteTransaction(db) },
+				{ id: 'durability', title: 'Durability Options', description: 'default, strict, relaxed', run: () => txOps.demonstrateDurabilityOptions(db) },
+				{ id: 'accessors', title: 'Transaction Accessors', description: 'getMode, getStoreNames, isActive', run: () => txOps.demonstrateTransactionAccessors(db) },
+				{ id: 'abort', title: 'Transaction Abort', description: 'Roll back all changes', run: () => txOps.demonstrateTransactionAbort(db) },
+				{ id: 'native', title: 'Native Access', description: 'Access native IDBTransaction', run: () => txOps.demonstrateNativeTransactionAccess(db) },
 			]
 		case 'cursors':
 			return [
-				{ id: 'iterate', title: 'iterate()', description: 'Async generator for records', useCase: '📧 Email Cleanup: Process each email one-by-one to check for spam', run: () => cursorOps.demonstrateCursorIterate(db) },
-				{ id: 'iteratekeys', title: 'iterateKeys()', description: 'Key-only iteration', useCase: '🔍 Validation: Check which IDs exist without loading full records', run: () => cursorOps.demonstrateIterateKeys(db) },
-				{ id: 'manual', title: 'Manual Cursor', description: 'openCursor() for full control', useCase: '📊 Analytics: Custom iteration with conditional early termination', run: () => cursorOps.demonstrateManualCursor(db) },
-				{ id: 'mutation', title: 'Cursor Mutation', description: 'Update and delete during iteration', useCase: '🧹 Cleanup: Delete all expired sessions while iterating', run: () => cursorOps.demonstrateCursorMutation(db) },
-				{ id: 'navigation', title: 'Cursor Navigation', description: 'continue, advance methods', useCase: '📄 Pagination: Skip to specific record for "Jump to Page" feature', run: () => cursorOps.demonstrateCursorNavigation(db) },
-				{ id: 'directions', title: 'Cursor Directions', description: 'next, previous, unique variants', useCase: '📰 Feed: Show newest posts first with reverse iteration', run: () => cursorOps.demonstrateCursorDirections(db) },
-				{ id: 'keycursor', title: 'Key Cursor', description: 'Efficient key-only cursor', useCase: '📋 Index: Build list of all document IDs for search index', run: () => cursorOps.demonstrateKeyCursor(db) },
-				{ id: 'indexcursor', title: 'Index Cursor', description: 'Iterate through index', useCase: '👥 Groups: Iterate users by department for org chart', run: () => cursorOps.demonstrateIndexCursor(db) },
+				{ id: 'iterate', title: 'iterate()', description: 'Async generator for records', run: () => cursorOps.demonstrateCursorIterate(db) },
+				{ id: 'iteratekeys', title: 'iterateKeys()', description: 'Key-only iteration', run: () => cursorOps.demonstrateIterateKeys(db) },
+				{ id: 'manual', title: 'Manual Cursor', description: 'openCursor() for full control', run: () => cursorOps.demonstrateManualCursor(db) },
+				{ id: 'mutation', title: 'Cursor Mutation', description: 'Update and delete during iteration', run: () => cursorOps.demonstrateCursorMutation(db) },
+				{ id: 'navigation', title: 'Cursor Navigation', description: 'continue, advance methods', run: () => cursorOps.demonstrateCursorNavigation(db) },
+				{ id: 'directions', title: 'Cursor Directions', description: 'next, previous, unique variants', run: () => cursorOps.demonstrateCursorDirections(db) },
+				{ id: 'keycursor', title: 'Key Cursor', description: 'Efficient key-only cursor', run: () => cursorOps.demonstrateKeyCursor(db) },
+				{ id: 'indexcursor', title: 'Index Cursor', description: 'Iterate through index', run: () => cursorOps.demonstrateIndexCursor(db) },
 			]
 		case 'events':
 			return [
-				{ id: 'dbchange', title: 'Database onChange', description: 'All store changes', useCase: '🔄 Real-time UI: Update dashboard whenever any data changes', run: () => eventOps.demonstrateDatabaseOnChange(db) },
-				{ id: 'storechange', title: 'Store onChange', description: 'Specific store changes', useCase: '💬 Chat: Only listen for new messages in chat store', run: () => eventOps.demonstrateStoreOnChange(db) },
-				{ id: 'crosstab', title: 'Cross-Tab Sync', description: 'BroadcastChannel synchronization', useCase: '🔗 Multi-tab: Logout from one tab signs out all open tabs', run: () => eventOps.demonstrateCrossTabSync(db) },
-				{ id: 'onerror', title: 'onError', description: 'Error event handling', useCase: '📊 Monitoring: Send database errors to analytics service', run: () => eventOps.demonstrateOnError(db) },
-				{ id: 'versionchange', title: 'onVersionChange', description: 'Handle version upgrades', useCase: '⬆️ App Update: Show "Please refresh" when new version deploys', run: () => eventOps.demonstrateOnVersionChange(db) },
-				{ id: 'onclose', title: 'onClose', description: 'Handle connection close', useCase: '🔌 Offline: Show offline indicator when DB connection lost', run: () => eventOps.demonstrateOnClose(db) },
-				{ id: 'hooks', title: 'Event Hooks', description: 'Configure hooks at creation', useCase: '🚀 Bootstrap: Set up all event handlers during app initialization', run: () => eventOps.demonstrateEventHooks() },
+				{ id: 'dbchange', title: 'Database onChange', description: 'All store changes', run: () => eventOps.demonstrateDatabaseOnChange(db) },
+				{ id: 'storechange', title: 'Store onChange', description: 'Specific store changes', run: () => eventOps.demonstrateStoreOnChange(db) },
+				{ id: 'crosstab', title: 'Cross-Tab Sync', description: 'BroadcastChannel synchronization', run: () => eventOps.demonstrateCrossTabSync(db) },
+				{ id: 'onerror', title: 'onError', description: 'Error event handling', run: () => eventOps.demonstrateOnError(db) },
+				{ id: 'versionchange', title: 'onVersionChange', description: 'Handle version upgrades', run: () => eventOps.demonstrateOnVersionChange(db) },
+				{ id: 'onclose', title: 'onClose', description: 'Handle connection close', run: () => eventOps.demonstrateOnClose(db) },
+				{ id: 'hooks', title: 'Event Hooks', description: 'Configure hooks at creation', run: () => eventOps.demonstrateEventHooks() },
 			]
 		case 'errors':
 			return [
-				{ id: 'notfound', title: 'NotFoundError', description: 'resolve() for missing records', useCase: '🔗 Deep Link: Show 404 page when URL contains invalid record ID', run: () => errorOps.demonstrateNotFoundError(db) },
-				{ id: 'constraint', title: 'ConstraintError', description: 'add() for duplicate keys', useCase: '📝 Registration: Show "Email already registered" error', run: () => errorOps.demonstrateConstraintError(db) },
-				{ id: 'codes', title: 'Error Codes', description: 'All error code enumeration', useCase: '📊 Logging: Map error codes to user-friendly messages', run: () => errorOps.demonstrateErrorCodes() },
-				{ id: 'guards', title: 'Type Guards', description: 'Safe error type checking', useCase: '🔀 Branching: Different recovery actions based on error type', run: () => errorOps.demonstrateTypeGuards(db) },
-				{ id: 'hierarchy', title: 'Error Hierarchy', description: 'Error class structure', useCase: '📚 Documentation: Understand which errors to catch where', run: () => errorOps.demonstrateErrorHierarchy() },
-				{ id: 'comprehensive', title: 'Comprehensive Handling', description: 'Best practices pattern', useCase: '💪 Production: Robust error handling for mission-critical apps', run: () => errorOps.demonstrateComprehensiveErrorHandling(db) },
+				{ id: 'notfound', title: 'NotFoundError', description: 'resolve() for missing records', run: () => errorOps.demonstrateNotFoundError(db) },
+				{ id: 'constraint', title: 'ConstraintError', description: 'add() for duplicate keys', run: () => errorOps.demonstrateConstraintError(db) },
+				{ id: 'codes', title: 'Error Codes', description: 'All error code enumeration', run: () => errorOps.demonstrateErrorCodes() },
+				{ id: 'guards', title: 'Type Guards', description: 'Safe error type checking', run: () => errorOps.demonstrateTypeGuards(db) },
+				{ id: 'hierarchy', title: 'Error Hierarchy', description: 'Error class structure', run: () => errorOps.demonstrateErrorHierarchy() },
+				{ id: 'comprehensive', title: 'Comprehensive Handling', description: 'Best practices pattern', run: () => errorOps.demonstrateComprehensiveErrorHandling(db) },
 			]
 	}
 }
@@ -186,6 +197,10 @@ function formatData(data: unknown): string {
 // ============================================================================
 
 function renderApp(): void {
+	// Cleanup previous demos
+	demoCleanups.forEach(cleanup => cleanup())
+	demoCleanups.length = 0
+
 	const app = document.getElementById('app')
 	if (!app) return
 
@@ -216,7 +231,7 @@ function renderApp(): void {
 
 	// Content
 	const content = createElement('main', { id: 'content' })
-	renderTabContent(content)
+	void renderTabContent(content)
 
 	// Footer
 	const footer = createElement('footer')
@@ -228,7 +243,7 @@ function renderApp(): void {
 	app.appendChild(container)
 }
 
-function renderTabContent(content: HTMLElement): void {
+async function renderTabContent(content: HTMLElement): Promise<void> {
 	const currentTab = TABS.find(t => t.id === activeTab)
 	if (!currentTab) return
 
@@ -238,6 +253,34 @@ function renderTabContent(content: HTMLElement): void {
 	const h2 = createElement('h2', { textContent: `${currentTab.emoji} ${currentTab.label}` })
 	const tabDesc = createElement('p', { className: 'subtitle', textContent: currentTab.description })
 	section.append(h2, tabDesc)
+
+	// Interactive Demo (if available)
+	if (currentTab.demo) {
+		const demo = currentTab.demo()
+		const demoContainer = createElement('div', { className: 'interactive-demo-container' })
+		demoContainer.innerHTML = demo.html
+
+		section.appendChild(demoContainer)
+
+		// Initialize demo after DOM is ready
+		if (demo.init) {
+			try {
+				await demo.init(demoContainer, db)
+			} catch (err) {
+				console.error('Demo init error:', err)
+			}
+		}
+
+		// Register cleanup
+		if (demo.cleanup) {
+			demoCleanups.push(demo.cleanup)
+		}
+
+		// Add separator before API examples
+		const separator = createElement('div', { className: 'demo-separator' })
+		separator.innerHTML = '<h3 style="margin: 24px 0 16px; color: #6b7280; font-size: 0.95rem;">📚 API Reference Examples</h3>'
+		section.appendChild(separator)
+	}
 
 	// Examples list
 	const examples = getExamplesForTab(activeTab)
@@ -258,8 +301,7 @@ function createExampleCard(example: ExampleDefinition): HTMLElement {
 	const header = createElement('div', { className: 'example-header' })
 	const title = createElement('h3', { textContent: example.title })
 	const desc = createElement('p', { className: 'example-desc', textContent: example.description })
-	const useCase = createElement('p', { className: 'example-usecase', textContent: example.useCase })
-	header.append(title, desc, useCase)
+	header.append(title, desc)
 
 	const runButton = createElement('button', { className: 'btn primary', textContent: '▶ Run Example' })
 	const resultArea = createElement('div', { className: 'example-result' })
