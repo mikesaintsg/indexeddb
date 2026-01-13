@@ -94,12 +94,17 @@ function getExamplesForTab(tab: TabId): readonly ExampleDefinition[] {
 				{ id: 'remove', title: 'remove() - Delete', description: 'Silently succeeds for missing keys', run: () => storeOps.demonstrateRemove(db) },
 				{ id: 'has', title: 'has() - Existence Check', description: 'Check if records exist', run: () => storeOps.demonstrateHas(db) },
 				{ id: 'bulk', title: 'Bulk Operations', description: 'all(), keys(), count(), clear()', run: () => storeOps.demonstrateBulkOperations(db) },
+				{ id: 'progress', title: 'Progress Callbacks', description: 'Track progress during bulk set/add', run: () => storeOps.demonstrateBulkProgressCallbacks(db) },
+				{ id: 'export', title: 'export() - Backup Data', description: 'Export all database data', run: () => storeOps.demonstrateExport(db) },
+				{ id: 'import', title: 'import() - Restore Data', description: 'Import data with progress tracking', run: () => storeOps.demonstrateImport(db) },
+				{ id: 'storage', title: 'Storage Quota', description: 'Get storage usage and quota info', run: () => storeOps.demonstrateStorageEstimate(db) },
 				{ id: 'accessors', title: 'Store Accessors', description: 'getName, getKeyPath, getIndexNames', run: () => storeOps.demonstrateStoreAccessors(db) },
 			]
 		case 'index':
 			return [
 				{ id: 'accessors', title: 'Index Accessors', description: 'getName, getKeyPath, isUnique, isMultiEntry', run: () => indexOps.demonstrateIndexAccessors(db) },
 				{ id: 'lookup', title: 'Index Lookup', description: 'get, resolve, getKey by index', run: () => indexOps.demonstrateIndexLookup(db) },
+				{ id: 'has', title: 'Index has() - Existence', description: 'Check if record exists by index key', run: () => indexOps.demonstrateIndexHas(db) },
 				{ id: 'nonunique', title: 'Non-Unique Index', description: 'Query non-unique index values', run: () => indexOps.demonstrateNonUniqueIndex(db) },
 				{ id: 'multientry', title: 'Multi-Entry Index', description: 'Index array elements separately', run: () => indexOps.demonstrateMultiEntryIndex(db) },
 				{ id: 'range', title: 'Range Queries', description: 'Numeric range queries on index', run: () => indexOps.demonstrateIndexRangeQueries(db) },

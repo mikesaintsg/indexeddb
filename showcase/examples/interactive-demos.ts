@@ -187,42 +187,37 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 
 			// Bulk insert handler
 			bulkInsertBtn.onclick = (): void => {
-				const count = parseInt(bulkCountSelect.value, 10)
-				bulkInsertBtn.disabled = true
-				bulkClearBtn.disabled = true
-				progressEl.style.display = 'block'
-				progressFill.style.width = '0%'
+				const count = parseInt((bulkCountSelect as HTMLSelectElement).value, 10)
+				;(bulkInsertBtn as HTMLButtonElement).disabled = true
+				;(bulkClearBtn as HTMLButtonElement).disabled = true
+				;(progressEl as HTMLElement).style.display = 'block'
+				;(progressFill as HTMLElement).style.width = '0%'
 				progressText.textContent = `Generating ${count.toLocaleString()} records...`
 
 				log(`Starting bulk insert of ${count.toLocaleString()} records...`, 'info')
 
 				void (async() => {
 					try {
-						// Generate records in batches for progress updates
-						const batchSize = 1000
-						const batches: User[][] = []
-						for (let i = 0; i < count; i += batchSize) {
-							const batch: User[] = []
-							const end = Math.min(i + batchSize, count)
-							for (let j = i; j < end; j++) {
-								batch.push(generateRandomUser(j))
-							}
-							batches.push(batch)
+						// Generate all records
+						const users: User[] = []
+						for (let i = 0; i < count; i++) {
+							users.push(generateRandomUser(i))
 						}
 
 						progressText.textContent = 'Inserting into IndexedDB...'
 						const startTime = performance.now()
 
-						// Insert all batches
-						for (let i = 0; i < batches.length; i++) {
-							const batch = batches[i]
-							if (batch) {
-								await store.set(batch)
-								const percent = Math.round(((i + 1) / batches.length) * 100)
-								progressFill.style.width = `${percent}%`
-								progressText.textContent = `Inserted ${((i + 1) * batchSize).toLocaleString()} of ${count.toLocaleString()}...`
-							}
-						}
+						// Use progress callback feature for real-time updates
+						await store.set(users, {
+							onProgress: (current, total) => {
+								const percent = Math.round((current / total) * 100)
+								;(progressFill as HTMLElement).style.width = `${percent}%`
+								// Update text every 5%
+								if (current % Math.ceil(total / 20) === 0 || current === total) {
+									progressText.textContent = `Inserted ${current.toLocaleString()} of ${total.toLocaleString()} (${percent}%)...`
+								}
+							},
+						})
 
 						const elapsed = performance.now() - startTime
 						const rate = Math.round(count / (elapsed / 1000))
@@ -233,19 +228,19 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 						log(`✅ Inserted ${count.toLocaleString()} records in ${elapsed.toFixed(0)}ms (${rate.toLocaleString()}/sec)`, 'success')
 
 						await updateCount()
-						progressEl.style.display = 'none'
+						;(progressEl as HTMLElement).style.display = 'none'
 					} catch (err) {
 						log(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
-						progressEl.style.display = 'none'
+						;(progressEl as HTMLElement).style.display = 'none'
 					} finally {
-						bulkInsertBtn.disabled = false
-						bulkClearBtn.disabled = false
+						;(bulkInsertBtn as HTMLButtonElement).disabled = false
+						;(bulkClearBtn as HTMLButtonElement).disabled = false
 					}
 				})()
 			}
 
 			// Clear handler
-			bulkClearBtn.onclick = (): void => {
+			;(bulkClearBtn as HTMLButtonElement).onclick = (): void => {
 				void (async() => {
 					try {
 						const count = await store.count()
@@ -268,9 +263,9 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 			}
 
 			// Query handler
-			runQueryBtn.onclick = (): void => {
-				const queryType = queryTypeSelect.value
-				runQueryBtn.disabled = true
+			;(runQueryBtn as HTMLButtonElement).onclick = (): void => {
+				const queryType = (queryTypeSelect as HTMLSelectElement).value
+				;(runQueryBtn as HTMLButtonElement).disabled = true
 
 				void (async() => {
 					try {
@@ -348,7 +343,7 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 					} catch (err) {
 						log(`Query error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
 					} finally {
-						runQueryBtn.disabled = false
+						;(runQueryBtn as HTMLButtonElement).disabled = false
 					}
 				})()
 			}
