@@ -63,12 +63,12 @@ interface TabDefinition {
 }
 
 const TABS: readonly TabDefinition[] = [
-	{ id: 'store', emoji: '📦', label: 'Store Operations', description: 'CRUD: get, resolve, set, add, remove, has, all, keys, count, clear', demo: createContactManagerDemo },
-	{ id: 'index', emoji: '🔖', label: 'Index Operations', description: 'Index queries, multi-entry indexes, unique constraints', demo: createEmailLookupDemo },
+	{ id: 'store', emoji: '⚡', label: 'Bulk Performance', description: 'Insert 10,000+ records with real-time metrics, query performance benchmarks', demo: createContactManagerDemo },
+	{ id: 'index', emoji: '🔖', label: 'Index Operations', description: 'O(1) lookups, multi-entry indexes, unique constraints', demo: createEmailLookupDemo },
 	{ id: 'query', emoji: '🔍', label: 'Query Builder', description: 'where, filter, orderBy, limit, offset, terminal operations', demo: createUserSearchDemo },
-	{ id: 'transactions', emoji: '⚡', label: 'Transactions', description: 'read, write, durability, abort, multi-store atomic operations', demo: createShoppingCartDemo },
-	{ id: 'cursors', emoji: '➡️', label: 'Cursors', description: 'iterate, iterateKeys, openCursor, navigation, mutation', demo: createDataExportDemo },
-	{ id: 'events', emoji: '📡', label: 'Events', description: 'onChange, onError, cross-tab sync, version change', demo: createActivityMonitorDemo },
+	{ id: 'transactions', emoji: '💳', label: 'Transactions', description: 'Atomic multi-store operations, durability options, abort/rollback', demo: createShoppingCartDemo },
+	{ id: 'cursors', emoji: '📁', label: 'Cursors', description: 'Memory-efficient streaming, iterate, iterateKeys, navigation', demo: createDataExportDemo },
+	{ id: 'events', emoji: '🌐', label: 'Cross-Tab Sync', description: 'FEATURED: Real-time synchronization between browser tabs', demo: createActivityMonitorDemo },
 	{ id: 'errors', emoji: '⚠️', label: 'Error Handling', description: 'Error classes, type guards, comprehensive patterns', demo: createRegistrationDemo },
 ]
 
@@ -89,11 +89,11 @@ function getExamplesForTab(tab: TabId): readonly ExampleDefinition[] {
 			return [
 				{ id: 'get', title: 'get() - Optional Lookup', description: 'Returns undefined for missing records', run: () => storeOps.demonstrateGet(db) },
 				{ id: 'resolve', title: 'resolve() - Required Lookup', description: 'Throws NotFoundError for missing records', run: () => storeOps.demonstrateResolve(db) },
-				{ id: 'set', title: 'set() - Upsert', description: 'Insert or update records', run: () => storeOps.demonstrateSet(db) },
+				{ id: 'set', title: 'set() - Upsert (single or batch)', description: 'Insert or update records, supports arrays', run: () => storeOps.demonstrateSet(db) },
 				{ id: 'add', title: 'add() - Insert Only', description: 'Throws ConstraintError if key exists', run: () => storeOps.demonstrateAdd(db) },
 				{ id: 'remove', title: 'remove() - Delete', description: 'Silently succeeds for missing keys', run: () => storeOps.demonstrateRemove(db) },
 				{ id: 'has', title: 'has() - Existence Check', description: 'Check if records exist', run: () => storeOps.demonstrateHas(db) },
-				{ id: 'bulk', title: 'Bulk Operations', description: 'all(), keys(), count()', run: () => storeOps.demonstrateBulkOperations(db) },
+				{ id: 'bulk', title: 'Bulk Operations', description: 'all(), keys(), count(), clear()', run: () => storeOps.demonstrateBulkOperations(db) },
 				{ id: 'accessors', title: 'Store Accessors', description: 'getName, getKeyPath, getIndexNames', run: () => storeOps.demonstrateStoreAccessors(db) },
 			]
 		case 'index':

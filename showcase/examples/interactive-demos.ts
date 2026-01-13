@@ -3,6 +3,11 @@
  *
  * Real-world mini-applications demonstrating IndexedDB features
  * with interactive UI elements users can manipulate.
+ *
+ * Features prominent demos of:
+ * - Cross-Tab Sync: Real-time synchronization between browser tabs
+ * - Bulk Performance: Insert/query 10,000+ records with timing
+ * - Transaction Atomicity: Visual demonstration of atomic operations
  */
 
 import type { DatabaseInterface, ChangeEvent, Unsubscribe } from '~/src/types.js'
@@ -19,7 +24,43 @@ export interface InteractiveDemoResult {
 }
 
 // ============================================================================
-// Store Operations: Contact Manager Demo
+// Helper: Generate realistic sample data
+// ============================================================================
+
+const FIRST_NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack', 'Kate', 'Leo', 'Maya', 'Noah', 'Olivia', 'Peter', 'Quinn', 'Rose', 'Sam', 'Tara']
+const LAST_NAMES = ['Anderson', 'Brown', 'Clark', 'Davis', 'Evans', 'Foster', 'Garcia', 'Harris', 'Ivanov', 'Jones', 'Kim', 'Lee', 'Miller', 'Nelson', 'Ortiz', 'Park', 'Quinn', 'Roberts', 'Smith', 'Taylor']
+const DOMAINS = ['gmail.com', 'outlook.com', 'yahoo.com', 'proton.me', 'icloud.com']
+const ROLES: ('admin' | 'user' | 'guest')[] = ['admin', 'user', 'user', 'user', 'guest']
+const STATUSES: ('active' | 'inactive')[] = ['active', 'active', 'active', 'inactive']
+const TAGS = ['developer', 'designer', 'manager', 'marketing', 'sales', 'support', 'hr', 'finance', 'ops', 'engineering']
+
+function generateRandomUser(index: number): User {
+	const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)] ?? 'User'
+	const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)] ?? 'Unknown'
+	const domain = DOMAINS[Math.floor(Math.random() * DOMAINS.length)] ?? 'example.com'
+	const role = ROLES[Math.floor(Math.random() * ROLES.length)] ?? 'user'
+	const status = STATUSES[Math.floor(Math.random() * STATUSES.length)] ?? 'active'
+	const tagCount = Math.floor(Math.random() * 4)
+	const userTags: string[] = []
+	for (let i = 0; i < tagCount; i++) {
+		const tag = TAGS[Math.floor(Math.random() * TAGS.length)]
+		if (tag && !userTags.includes(tag)) userTags.push(tag)
+	}
+
+	return {
+		id: `bulk-${index}-${Date.now()}`,
+		name: `${firstName} ${lastName}`,
+		email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${index}@${domain}`,
+		age: 18 + Math.floor(Math.random() * 50),
+		status,
+		role,
+		tags: userTags,
+		createdAt: Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000),
+	}
+}
+
+// ============================================================================
+// Store Operations: Bulk Performance Demo (10,000+ records)
 // ============================================================================
 
 export function createContactManagerDemo(): InteractiveDemoResult {
@@ -27,143 +68,269 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 
 	return {
 		html: `
-			<div class="demo-app contact-manager">
-				<h4>📇 Contact Manager</h4>
-				<p class="demo-desc">Add, edit, and delete contacts using <code>set()</code>, <code>get()</code>, and <code>remove()</code></p>
+			<div class="demo-app bulk-performance">
+				<h4>⚡ Bulk Performance Demo</h4>
+				<p class="demo-desc">Insert and query <strong>10,000+ records</strong> with real-time performance metrics. Shows the power of IndexedDB for large datasets.</p>
 
-				<div class="demo-form">
-					<input type="text" id="contact-name" placeholder="Name" class="demo-input" />
-					<input type="email" id="contact-email" placeholder="Email" class="demo-input" />
-					<input type="number" id="contact-age" placeholder="Age" class="demo-input" min="1" max="120" />
-					<button id="add-contact-btn" class="btn primary">➕ Add Contact</button>
+				<div class="performance-panel">
+					<div class="perf-controls">
+						<div class="perf-row">
+							<label>Records to insert:</label>
+							<select id="bulk-count" class="demo-select">
+								<option value="1000">1,000</option>
+								<option value="5000">5,000</option>
+								<option value="10000" selected>10,000</option>
+								<option value="25000">25,000</option>
+								<option value="50000">50,000</option>
+							</select>
+							<button id="bulk-insert-btn" class="btn primary">🚀 Bulk Insert</button>
+							<button id="bulk-clear-btn" class="btn danger">🗑️ Clear All</button>
+						</div>
+					</div>
+
+					<div class="perf-stats">
+						<div class="perf-stat-card">
+							<span class="perf-label">Total Records</span>
+							<span class="perf-value" id="total-records">0</span>
+						</div>
+						<div class="perf-stat-card">
+							<span class="perf-label">Insert Time</span>
+							<span class="perf-value" id="insert-time">—</span>
+						</div>
+						<div class="perf-stat-card">
+							<span class="perf-label">Records/sec</span>
+							<span class="perf-value" id="insert-rate">—</span>
+						</div>
+						<div class="perf-stat-card">
+							<span class="perf-label">Query Time</span>
+							<span class="perf-value" id="query-time">—</span>
+						</div>
+					</div>
+
+					<div class="perf-progress" id="perf-progress" style="display: none;">
+						<div class="progress-bar">
+							<div class="progress-fill" id="perf-progress-fill" style="width: 0%"></div>
+						</div>
+						<span id="perf-progress-text">Preparing...</span>
+					</div>
 				</div>
 
-				<div class="demo-stats" id="contact-stats">
-					<span class="stat">Total: <strong id="total-contacts">0</strong></span>
-					<span class="stat">Active: <strong id="active-contacts">0</strong></span>
+				<div class="query-section">
+					<h5>🔍 Query Performance</h5>
+					<div class="query-row">
+						<select id="query-type" class="demo-select">
+							<option value="all">all() - Get all records</option>
+							<option value="count">count() - Count records</option>
+							<option value="status">where(status).equals('active')</option>
+							<option value="age-range">where(age).between(25, 40)</option>
+							<option value="role">where(role).equals('admin')</option>
+							<option value="filter">filter(age > 30 AND role='user')</option>
+						</select>
+						<button id="run-query-btn" class="btn primary">▶ Run Query</button>
+					</div>
+					<div class="query-results" id="query-results">
+						<p class="placeholder">Select a query and click Run</p>
+					</div>
 				</div>
 
-				<div class="demo-list" id="contact-list">
-					<p class="placeholder">Loading contacts...</p>
-				</div>
-
-				<div class="demo-log" id="contact-log"></div>
+				<div class="demo-log" id="bulk-log"></div>
 			</div>
 		`,
 		init: async(container, db) => {
 			const store = db.store('users')
-			const listEl = container.querySelector('#contact-list')!
-			const logEl = container.querySelector('#contact-log')!
-			const totalEl = container.querySelector('#total-contacts')!
-			const activeEl = container.querySelector('#active-contacts')!
-			const nameInput = container.querySelector('#contact-name')!
-			const emailInput = container.querySelector('#contact-email')!
-			const ageInput = container.querySelector('#contact-age')!
-			const addBtn = container.querySelector('#add-contact-btn')!
+			const totalEl = container.querySelector('#total-records')!
+			const insertTimeEl = container.querySelector('#insert-time')!
+			const insertRateEl = container.querySelector('#insert-rate')!
+			const queryTimeEl = container.querySelector('#query-time')!
+			const progressEl = container.querySelector('#perf-progress')!
+			const progressFill = container.querySelector('#perf-progress-fill')!
+			const progressText = container.querySelector('#perf-progress-text')!
+			const bulkCountSelect = container.querySelector('#bulk-count')!
+			const bulkInsertBtn = container.querySelector('#bulk-insert-btn')!
+			const bulkClearBtn = container.querySelector('#bulk-clear-btn')!
+			const queryTypeSelect = container.querySelector('#query-type')!
+			const runQueryBtn = container.querySelector('#run-query-btn')!
+			const queryResultsEl = container.querySelector('#query-results')!
+			const logEl = container.querySelector('#bulk-log')!
 
 			function log(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
 				const entry = document.createElement('div')
 				entry.className = `log-entry ${type}`
 				entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`
 				logEl.insertBefore(entry, logEl.firstChild)
-				if (logEl.children.length > 5 && logEl.lastChild) logEl.removeChild(logEl.lastChild)
+				if (logEl.children.length > 8 && logEl.lastChild) logEl.removeChild(logEl.lastChild)
 			}
 
-			async function refreshList(): Promise<void> {
-				const users = await store.all()
-				const activeCount = users.filter(u => u.status === 'active').length
+			async function updateCount(): Promise<void> {
+				const count = await store.count()
+				totalEl.textContent = count.toLocaleString()
+			}
 
-				totalEl.textContent = String(users.length)
-				activeEl.textContent = String(activeCount)
+			// Bulk insert handler
+			bulkInsertBtn.onclick = (): void => {
+				const count = parseInt(bulkCountSelect.value, 10)
+				bulkInsertBtn.disabled = true
+				bulkClearBtn.disabled = true
+				progressEl.style.display = 'block'
+				progressFill.style.width = '0%'
+				progressText.textContent = `Generating ${count.toLocaleString()} records...`
 
-				if (users.length === 0) {
-					listEl.innerHTML = '<p class="placeholder">No contacts yet. Add one above!</p>'
-					return
-				}
+				log(`Starting bulk insert of ${count.toLocaleString()} records...`, 'info')
 
-				listEl.innerHTML = users.map(user => `
-					<div class="list-item" data-id="${user.id}">
-						<div class="item-info">
-							<strong>${user.name}</strong>
-							<span class="item-meta">${user.email} • Age ${user.age} • ${user.status}</span>
-						</div>
-						<div class="item-actions">
-							<button class="btn small toggle-status" data-id="${user.id}" title="Toggle Status">
-								${user.status === 'active' ? '✅' : '❌'}
-							</button>
-							<button class="btn small danger delete-contact" data-id="${user.id}" title="Delete">🗑️</button>
-						</div>
-					</div>
-				`).join('')
-
-				// Attach event handlers
-				listEl.querySelectorAll('.toggle-status').forEach(btn => {
-					const button = btn as HTMLButtonElement
-					button.onclick = (): void => {
-						const id = button.dataset.id ?? ''
-						void store.get(id).then(async(user) => {
-							if (user) {
-								const updated: User = { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-								await store.set(updated)
-								log(`set() - Toggled ${user.name} to ${updated.status}`, 'success')
+				void (async() => {
+					try {
+						// Generate records in batches for progress updates
+						const batchSize = 1000
+						const batches: User[][] = []
+						for (let i = 0; i < count; i += batchSize) {
+							const batch: User[] = []
+							const end = Math.min(i + batchSize, count)
+							for (let j = i; j < end; j++) {
+								batch.push(generateRandomUser(j))
 							}
-						}).catch((err: unknown) => {
-							log(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
-						})
-					}
-				})
+							batches.push(batch)
+						}
 
-				listEl.querySelectorAll('.delete-contact').forEach(btn => {
-					const button = btn as HTMLButtonElement
-					button.onclick = (): void => {
-						const id = button.dataset.id ?? ''
-						void store.get(id).then(async(user) => {
-							await store.remove(id)
-							log(`remove() - Deleted ${user?.name ?? id}`, 'success')
-						}).catch((err: unknown) => {
-							log(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
-						})
+						progressText.textContent = 'Inserting into IndexedDB...'
+						const startTime = performance.now()
+
+						// Insert all batches
+						for (let i = 0; i < batches.length; i++) {
+							const batch = batches[i]
+							if (batch) {
+								await store.set(batch)
+								const percent = Math.round(((i + 1) / batches.length) * 100)
+								progressFill.style.width = `${percent}%`
+								progressText.textContent = `Inserted ${((i + 1) * batchSize).toLocaleString()} of ${count.toLocaleString()}...`
+							}
+						}
+
+						const elapsed = performance.now() - startTime
+						const rate = Math.round(count / (elapsed / 1000))
+
+						insertTimeEl.textContent = `${elapsed.toFixed(0)}ms`
+						insertRateEl.textContent = rate.toLocaleString()
+
+						log(`✅ Inserted ${count.toLocaleString()} records in ${elapsed.toFixed(0)}ms (${rate.toLocaleString()}/sec)`, 'success')
+
+						await updateCount()
+						progressEl.style.display = 'none'
+					} catch (err) {
+						log(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
+						progressEl.style.display = 'none'
+					} finally {
+						bulkInsertBtn.disabled = false
+						bulkClearBtn.disabled = false
 					}
-				})
+				})()
 			}
 
-			// Add contact handler
-			addBtn.onclick = (): void => {
-				const name = nameInput.value.trim()
-				const email = emailInput.value.trim()
-				const age = parseInt(ageInput.value, 10)
+			// Clear handler
+			bulkClearBtn.onclick = (): void => {
+				void (async() => {
+					const count = await store.count()
+					await store.clear()
+					log(`Cleared ${count.toLocaleString()} records`, 'info')
+					await updateCount()
+					insertTimeEl.textContent = '—'
+					insertRateEl.textContent = '—'
+					queryTimeEl.textContent = '—'
+				})()
+			}
 
-				if (!name || !email || isNaN(age)) {
-					log('Please fill all fields', 'error')
-					return
-				}
+			// Query handler
+			runQueryBtn.onclick = (): void => {
+				const queryType = queryTypeSelect.value
+				runQueryBtn.disabled = true
 
-				const newUser: User = {
-					id: `u-${Date.now()}`,
-					name,
-					email,
-					age,
-					status: 'active',
-					role: 'user',
-					tags: [],
-					createdAt: Date.now(),
-				}
+				void (async() => {
+					try {
+						const startTime = performance.now()
+						let result: unknown
+						let resultCount = 0
+						let queryCode = ''
 
-				void store.set(newUser).then(() => {
-					log(`set() - Added "${name}"`, 'success')
-					nameInput.value = ''
-					emailInput.value = ''
-					ageInput.value = ''
-				})
+						switch (queryType) {
+							case 'all': {
+								const all = await store.all()
+								resultCount = all.length
+								result = all.slice(0, 5)
+								queryCode = 'await store.all()'
+								break
+							}
+							case 'count': {
+								resultCount = await store.count()
+								result = resultCount
+								queryCode = 'await store.count()'
+								break
+							}
+							case 'status': {
+								const active = await store.query().where('byStatus').equals('active').toArray()
+								resultCount = active.length
+								result = active.slice(0, 5)
+								queryCode = "await store.query().where('byStatus').equals('active').toArray()"
+								break
+							}
+							case 'age-range': {
+								const range = await store.query().where('byAge').between(25, 40).toArray()
+								resultCount = range.length
+								result = range.slice(0, 5)
+								queryCode = "await store.query().where('byAge').between(25, 40).toArray()"
+								break
+							}
+							case 'role': {
+								const admins = await store.query().where('byRole').equals('admin').toArray()
+								resultCount = admins.length
+								result = admins.slice(0, 5)
+								queryCode = "await store.query().where('byRole').equals('admin').toArray()"
+								break
+							}
+							case 'filter': {
+								const filtered = await store.query()
+									.filter(u => u.age > 30 && u.role === 'user')
+									.toArray()
+								resultCount = filtered.length
+								result = filtered.slice(0, 5)
+								queryCode = "await store.query().filter(u => u.age > 30 && u.role === 'user').toArray()"
+								break
+							}
+						}
+
+						const elapsed = performance.now() - startTime
+						queryTimeEl.textContent = `${elapsed.toFixed(1)}ms`
+
+						queryResultsEl.innerHTML = `
+							<div class="query-result-box">
+								<div class="query-meta">
+									<span class="query-count">Found: <strong>${resultCount.toLocaleString()}</strong> records</span>
+									<span class="query-elapsed">Time: <strong>${elapsed.toFixed(1)}ms</strong></span>
+								</div>
+								<div class="query-code-block">
+									<code class="syntax-highlight">${queryCode}</code>
+								</div>
+								<div class="query-preview">
+									<strong>Preview (first 5):</strong>
+									<pre>${JSON.stringify(result, null, 2)}</pre>
+								</div>
+							</div>
+						`
+
+						log(`Query returned ${resultCount.toLocaleString()} records in ${elapsed.toFixed(1)}ms`, 'success')
+					} catch (err) {
+						log(`Query error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error')
+					} finally {
+						runQueryBtn.disabled = false
+					}
+				})()
 			}
 
 			// Listen for changes
 			cleanup = store.onChange(() => {
-				void refreshList()
+				void updateCount()
 			})
 
-			await refreshList()
-			log('Contact Manager ready!', 'info')
+			await updateCount()
+			log('Bulk Performance Demo ready! Try inserting 10,000+ records.', 'info')
 		},
 		cleanup: () => {
 			cleanup?.()
@@ -479,7 +646,7 @@ export function createShoppingCartDemo(): InteractiveDemoResult {
 }
 
 // ============================================================================
-// Events: Live Activity Monitor Demo
+// Events: Cross-Tab Sync Demo (FEATURED - Most Powerful Feature)
 // ============================================================================
 
 export function createActivityMonitorDemo(): InteractiveDemoResult {
@@ -487,44 +654,122 @@ export function createActivityMonitorDemo(): InteractiveDemoResult {
 
 	return {
 		html: `
-			<div class="demo-app activity-monitor">
-				<h4>📡 Live Activity Monitor</h4>
-				<p class="demo-desc">Watch <code>onChange</code> events in real-time as data changes</p>
-
-				<div class="monitor-controls">
-					<button id="add-random-btn" class="btn primary">➕ Add User</button>
-					<button id="update-random-btn" class="btn">✏️ Update User</button>
-					<button id="delete-random-btn" class="btn danger">🗑️ Delete User</button>
+			<div class="demo-app cross-tab-sync featured-demo">
+				<div class="featured-banner">
+					<span class="featured-icon">🌐</span>
+					<span class="featured-text">REAL-TIME CROSS-TAB SYNC</span>
 				</div>
 
-				<div class="monitor-stats">
-					<span class="stat">Events: <strong id="event-count">0</strong></span>
-					<span class="stat">Last: <strong id="last-event-type">-</strong></span>
+				<h4>📡 Cross-Tab Synchronization Demo</h4>
+				<p class="demo-desc">
+					<strong>The most powerful browser storage feature!</strong> Changes made in one tab are <strong>instantly synchronized</strong>
+					to all other open tabs via <code>BroadcastChannel</code>. Try it now:
+				</p>
+
+				<div class="cross-tab-instruction">
+					<div class="instruction-step">
+						<span class="step-number">1</span>
+						<span class="step-text">Open this page in <strong>2+ browser tabs</strong></span>
+						<button id="open-new-tab" class="btn small">🔗 Open New Tab</button>
+					</div>
+					<div class="instruction-step">
+						<span class="step-number">2</span>
+						<span class="step-text">Click a button below in <strong>this tab</strong></span>
+					</div>
+					<div class="instruction-step">
+						<span class="step-number">3</span>
+						<span class="step-text">Watch the event appear in the <strong>other tab</strong> instantly!</span>
+					</div>
 				</div>
 
-				<div class="event-feed" id="event-feed">
-					<p class="placeholder">Waiting for events...</p>
+				<div class="sync-controls">
+					<button id="sync-add-btn" class="btn primary large-btn">➕ Add User (triggers cross-tab event)</button>
+					<button id="sync-update-btn" class="btn large-btn">✏️ Update Random User</button>
+					<button id="sync-delete-btn" class="btn danger large-btn">🗑️ Delete Random User</button>
 				</div>
 
-				<p class="demo-tip">💡 Open in another tab to see cross-tab sync!</p>
+				<div class="sync-stats">
+					<div class="sync-stat-card local">
+						<span class="sync-stat-label">Local Events</span>
+						<span class="sync-stat-value" id="local-event-count">0</span>
+						<span class="sync-stat-desc">Changes made in this tab</span>
+					</div>
+					<div class="sync-stat-card remote">
+						<span class="sync-stat-label">📡 Remote Events</span>
+						<span class="sync-stat-value" id="remote-event-count">0</span>
+						<span class="sync-stat-desc">Changes from other tabs</span>
+					</div>
+					<div class="sync-stat-card total">
+						<span class="sync-stat-label">Total Events</span>
+						<span class="sync-stat-value" id="total-event-count">0</span>
+						<span class="sync-stat-desc">All synchronized changes</span>
+					</div>
+				</div>
+
+				<h5>📜 Live Event Feed</h5>
+				<div class="event-feed enhanced-feed" id="sync-event-feed">
+					<p class="placeholder">Make a change or wait for events from other tabs...</p>
+				</div>
+
+				<div class="code-example-box">
+					<h5>💻 How It Works</h5>
+					<pre class="syntax-code"><code><span class="keyword">const</span> db = <span class="function">createDatabase</span>({
+  name: <span class="string">'myApp'</span>,
+  version: <span class="number">1</span>,
+  stores: { users: {} }
+})
+
+<span class="comment">// Subscribe to ALL changes (local + remote)</span>
+db.<span class="function">onChange</span>((event) =&gt; {
+  <span class="keyword">if</span> (event.source === <span class="string">'remote'</span>) {
+    <span class="comment">// This change came from another tab!</span>
+    console.<span class="function">log</span>(<span class="string">'📡 Cross-tab:'</span>, event.type, event.keys)
+  }
+})</code></pre>
+				</div>
+
+				<div class="demo-log" id="sync-log"></div>
 			</div>
 		`,
 		init: (container, db) => {
-			const feedEl = container.querySelector('#event-feed')!
-			const eventCountEl = container.querySelector('#event-count')!
-			const lastEventTypeEl = container.querySelector('#last-event-type')!
-			const addBtn = container.querySelector('#add-random-btn')!
-			const updateBtn = container.querySelector('#update-random-btn')!
-			const deleteBtn = container.querySelector('#delete-random-btn')!
+			const feedEl = container.querySelector('#sync-event-feed')!
+			const localCountEl = container.querySelector('#local-event-count')!
+			const remoteCountEl = container.querySelector('#remote-event-count')!
+			const totalCountEl = container.querySelector('#total-event-count')!
+			const addBtn = container.querySelector('#sync-add-btn')!
+			const updateBtn = container.querySelector('#sync-update-btn')!
+			const deleteBtn = container.querySelector('#sync-delete-btn')!
+			const openTabBtn = container.querySelector('#open-new-tab')!
+			const logEl = container.querySelector('#sync-log')!
 
 			const store = db.store('users')
-			let eventCount = 0
+			let localCount = 0
+			let remoteCount = 0
 			let isFirstEvent = true
 
+			function log(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
+				const entry = document.createElement('div')
+				entry.className = `log-entry ${type}`
+				entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`
+				logEl.insertBefore(entry, logEl.firstChild)
+				if (logEl.children.length > 6 && logEl.lastChild) logEl.removeChild(logEl.lastChild)
+			}
+
 			function addEvent(event: ChangeEvent): void {
-				eventCount++
-				eventCountEl.textContent = String(eventCount)
-				lastEventTypeEl.textContent = event.type
+				const isRemote = event.source === 'remote'
+
+				if (isRemote) {
+					remoteCount++
+					remoteCountEl.textContent = String(remoteCount)
+					// Flash the remote counter for visual emphasis
+					remoteCountEl.parentElement?.classList.add('flash')
+					setTimeout(() => remoteCountEl.parentElement?.classList.remove('flash'), 500)
+				} else {
+					localCount++
+					localCountEl.textContent = String(localCount)
+				}
+
+				totalCountEl.textContent = String(localCount + remoteCount)
 
 				if (isFirstEvent) {
 					feedEl.innerHTML = ''
@@ -532,19 +777,41 @@ export function createActivityMonitorDemo(): InteractiveDemoResult {
 				}
 
 				const entry = document.createElement('div')
-				entry.className = `event-entry event-${event.type}`
-				const crossTabBadge = event.source === 'remote' ? '<span class="event-cross-tab">📡 Cross-Tab</span>' : ''
+				entry.className = `event-entry enhanced ${isRemote ? 'remote-event' : 'local-event'} event-${event.type}`
+
+				const sourceLabel = isRemote
+					? '<span class="source-badge remote">📡 FROM OTHER TAB</span>'
+					: '<span class="source-badge local">🏠 This Tab</span>'
+
+				const typeBadgeMap: Record<string, string> = {
+					set: '<span class="type-badge set">SET</span>',
+					add: '<span class="type-badge add">ADD</span>',
+					remove: '<span class="type-badge remove">DELETE</span>',
+				}
+				const typeBadge = typeBadgeMap[event.type] ?? `<span class="type-badge">${event.type.toUpperCase()}</span>`
+
 				entry.innerHTML = `
-					<span class="event-time">${new Date().toLocaleTimeString()}</span>
-					<span class="event-badge ${event.type}">${event.type.toUpperCase()}</span>
-					<span class="event-store">${event.storeName}</span>
-					<span class="event-keys">Keys: ${JSON.stringify(event.keys)}</span>
-					${crossTabBadge}
+					<div class="event-header">
+						${sourceLabel}
+						${typeBadge}
+						<span class="event-time">${new Date().toLocaleTimeString()}</span>
+					</div>
+					<div class="event-details">
+						<span class="event-store">Store: <strong>${event.storeName}</strong></span>
+						<span class="event-keys">Keys: <code>${JSON.stringify(event.keys)}</code></span>
+					</div>
 				`
+
+				// Add animation class
+				entry.classList.add('slide-in')
 				feedEl.insertBefore(entry, feedEl.firstChild)
 
-				while (feedEl.children.length > 10 && feedEl.lastChild) {
+				while (feedEl.children.length > 15 && feedEl.lastChild) {
 					feedEl.removeChild(feedEl.lastChild)
+				}
+
+				if (isRemote) {
+					log(`📡 CROSS-TAB: ${event.type} on ${event.storeName}`, 'success')
 				}
 			}
 
@@ -552,46 +819,62 @@ export function createActivityMonitorDemo(): InteractiveDemoResult {
 				addEvent(event)
 			})
 
-			const names = ['Alex', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley']
-			const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones']
+			// Open new tab button
+			openTabBtn.onclick = (): void => {
+				window.open(window.location.href, '_blank')
+				log('Opened new tab - try making changes there!', 'info')
+			}
 
 			addBtn.onclick = (): void => {
-				const firstName = names[Math.floor(Math.random() * names.length)]
-				const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
+				const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)] ?? 'User'
+				const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)] ?? 'Test'
+				const domain = DOMAINS[Math.floor(Math.random() * DOMAINS.length)] ?? 'example.com'
 				const name = `${firstName} ${lastName}`
 				const newUser: User = {
-					id: `u-${Date.now()}`,
+					id: `sync-${Date.now()}`,
 					name,
-					email: `${name.toLowerCase().replace(' ', '.')}@example.com`,
+					email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${domain}`,
 					age: 20 + Math.floor(Math.random() * 40),
 					status: 'active',
 					role: 'user',
 					tags: [],
 					createdAt: Date.now(),
 				}
-				void store.set(newUser).catch(() => { /* ignore */ })
+				void store.set(newUser).then(() => {
+					log(`Added "${name}" - check other tabs!`, 'success')
+				}).catch(() => { /* ignore */ })
 			}
 
 			updateBtn.onclick = (): void => {
 				void store.all().then(async(users) => {
-					if (users.length === 0) return
+					if (users.length === 0) {
+						log('No users to update. Add some first!', 'error')
+						return
+					}
 					const user = users[Math.floor(Math.random() * users.length)]
 					if (user) {
 						const updated: User = { ...user, age: user.age + 1 }
 						await store.set(updated)
+						log(`Updated "${user.name}" age to ${updated.age}`, 'success')
 					}
 				}).catch(() => { /* ignore */ })
 			}
 
 			deleteBtn.onclick = (): void => {
 				void store.all().then(async(users) => {
-					if (users.length === 0) return
+					if (users.length === 0) {
+						log('No users to delete. Add some first!', 'error')
+						return
+					}
 					const user = users[Math.floor(Math.random() * users.length)]
 					if (user) {
 						await store.remove(user.id)
+						log(`Deleted "${user.name}"`, 'success')
 					}
 				}).catch(() => { /* ignore */ })
 			}
+
+			log('Cross-Tab Sync Demo ready! Open another tab to test.', 'info')
 		},
 		cleanup: () => {
 			cleanup?.()
