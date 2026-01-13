@@ -124,6 +124,48 @@ export class Index<T> implements IndexInterface<T> {
 		return this.#request(index.getKey(key))
 	}
 
+	// ─── Has ─────────────────────────────────────────────────
+
+	/**
+	 * Check if a record exists by index key.
+	 *
+	 * @param key - The index key to check
+	 * @returns true if at least one record exists with this index key
+	 *
+	 * @example
+	 * ```ts
+	 * const emailExists = await db.store('users').index('byEmail').has('alice@test.com')
+	 * ```
+	 */
+	has(key: ValidKey): Promise<boolean>
+
+	/**
+	 * Check if records exist by index keys.
+	 *
+	 * @param keys - The index keys to check
+	 * @returns Array of booleans indicating existence
+	 */
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
+	async has(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<boolean | readonly boolean[]> {
+		const db = await this.#ensureOpen()
+		const tx = db.transaction([this.#storeName], 'readonly')
+		const store = tx.objectStore(this.#storeName)
+		const index = store.index(this.#indexName)
+
+		if (Array.isArray(keyOrKeys)) {
+			return await Promise.all(
+				keyOrKeys.map(async k => {
+					const count = await this.#request(index.count(k))
+					return count > 0
+				}),
+			)
+		}
+
+		const count = await this.#request(index.count(keyOrKeys as IDBValidKey))
+		return count > 0
+	}
+
 	// ─── Bulk Operations ─────────────────────────────────────
 
 	async all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]> {

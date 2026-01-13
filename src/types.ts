@@ -153,6 +153,23 @@ export interface BetweenOptions {
 export type OrderDirection = 'ascending' | 'descending'
 
 // ============================================================================
+// Bulk Operation Types
+// ============================================================================
+
+/**
+ * Options for bulk operations.
+ */
+export interface BulkOperationOptions {
+	/**
+	 * Progress callback for bulk operations.
+	 *
+	 * @param current - Current item index (1-based)
+	 * @param total - Total number of items
+	 */
+	readonly onProgress?: (current: number, total: number) => void
+}
+
+// ============================================================================
 // Event Types
 // ============================================================================
 
@@ -291,6 +308,68 @@ export interface DatabaseOptions<Schema extends DatabaseSchema>
 }
 
 // ============================================================================
+// Export/Import Types
+// ============================================================================
+
+/**
+ * Exported database data structure.
+ *
+ * @remarks
+ * Represents a complete snapshot of database data for backup or transfer.
+ */
+export interface ExportedData<Schema extends DatabaseSchema> {
+	/** Database name */
+	readonly name: string
+	/** Database version */
+	readonly version: number
+	/** Export timestamp (ISO string) */
+	readonly exportedAt: string
+	/** Store data mapped by store name */
+	readonly stores: { [K in keyof Schema]: readonly Schema[K][] }
+}
+
+/**
+ * Options for importing data.
+ */
+export interface ImportOptions {
+	/**
+	 * Import mode.
+	 *
+	 * - `'merge'`: Keep existing records, add/update from import (default)
+	 * - `'replace'`: Clear existing records before import
+	 */
+	readonly mode?: 'merge' | 'replace'
+
+	/**
+	 * Progress callback for import operations.
+	 *
+	 * @param storeName - Current store being imported
+	 * @param current - Current record index (1-based)
+	 * @param total - Total records in store
+	 */
+	readonly onProgress?: (storeName: string, current: number, total: number) => void
+}
+
+// ============================================================================
+// Storage Quota Types
+// ============================================================================
+
+/**
+ * Storage estimate information.
+ *
+ * @remarks
+ * Provides insight into browser storage usage and availability.
+ */
+export interface StorageEstimate {
+	/** Approximate bytes used by this origin */
+	readonly usage: number
+	/** Approximate bytes available to this origin */
+	readonly quota: number
+	/** Percentage of quota used (0-100) */
+	readonly percentUsed: number
+}
+
+// ============================================================================
 // Core Interfaces
 // ============================================================================
 
@@ -407,6 +486,62 @@ export interface DatabaseInterface<Schema extends DatabaseSchema>
 	 * This permanently removes all data.
 	 */
 	drop(): Promise<void>
+
+	// ─── Export/Import ───────────────────────────────────────
+
+	/**
+	 * Export all data from the database.
+	 *
+	 * @returns Exported data structure
+	 *
+	 * @example
+	 * ```ts
+	 * const backup = await db.export()
+	 * const json = JSON.stringify(backup)
+	 * localStorage.setItem('backup', json)
+	 * ```
+	 */
+	export(): Promise<ExportedData<Schema>>
+
+	/**
+	 * Import data into the database.
+	 *
+	 * @param data - Data to import
+	 * @param options - Import options (mode, progress callback)
+	 *
+	 * @example
+	 * ```ts
+	 * const json = localStorage.getItem('backup')
+	 * const backup = JSON.parse(json)
+	 * await db.import(backup, {
+	 *   mode: 'replace',
+	 *   onProgress: (store, current, total) => {
+	 *     console.log(`${store}: ${current}/${total}`)
+	 *   }
+	 * })
+	 * ```
+	 */
+	import(data: ExportedData<Schema>, options?: ImportOptions): Promise<void>
+
+	// ─── Storage ─────────────────────────────────────────────
+
+	/**
+	 * Get storage estimate for this origin.
+	 *
+	 * @returns Storage usage and quota information
+	 *
+	 * @remarks
+	 * Uses the Storage API when available. Returns zeros if unsupported.
+	 *
+	 * @example
+	 * ```ts
+	 * const estimate = await db.getStorageEstimate()
+	 * if (estimate.percentUsed > 80) {
+	 *   console.warn('Storage nearly full!')
+	 * }
+	 * ```
+	 */
+	getStorageEstimate(): Promise<StorageEstimate>
 }
 
 /**
@@ -552,6 +687,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	 * Store multiple records in a single transaction.
 	 *
 	 * @param values - Array of records to store
+	 * @param options - Optional progress callback
 	 * @returns Array of keys for stored records
 	 *
 	 * @example
@@ -559,7 +695,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	 * const keys = await store.set([user1, user2, user3])
 	 * ```
 	 */
-	set(values: readonly T[]): Promise<readonly ValidKey[]>
+	set(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
 
 	// ─── Add (insert only) ───────────────────────────────────
 
@@ -588,10 +724,11 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	 * Add multiple records (insert only, fails if any key exists).
 	 *
 	 * @param values - Array of records to add
+	 * @param options - Optional progress callback
 	 * @returns Array of keys for added records
 	 * @throws ConstraintError if any key already exists
 	 */
-	add(values: readonly T[]): Promise<readonly ValidKey[]>
+	add(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
 
 	// ─── Remove ──────────────────────────────────────────────
 
@@ -838,6 +975,24 @@ export interface IndexInterface<T> {
 	 */
 	getKey(key: ValidKey): Promise<ValidKey | undefined>
 
+	// ─── Has ─────────────────────────────────────────────────
+
+	/**
+	 * Check if record(s) exist by index key.
+	 *
+	 * @param key - The index key to check
+	 * @returns true if at least one record exists
+	 */
+	has(key: ValidKey): Promise<boolean>
+
+	/**
+	 * Check if records exist by index keys.
+	 *
+	 * @param keys - The index keys to check
+	 * @returns Array of booleans indicating existence
+	 */
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
 	// ─── Bulk Operations ─────────────────────────────────────
 
 	/**
@@ -979,6 +1134,61 @@ export interface TransactionInterface<
 }
 
 /**
+ * Transaction-bound index interface.
+ *
+ * @remarks
+ * Subset of IndexInterface that operates within a transaction.
+ * Does not include query(), iterate(), or iterateKeys() as these
+ * require transaction lifecycle control.
+ */
+export interface TransactionIndexInterface<T> {
+	/** Access the underlying IDBIndex */
+	readonly native: IDBIndex
+
+	/** Get the index name */
+	getName(): string
+
+	/** Get the index key path */
+	getKeyPath(): KeyPath
+
+	/** Check if the index enforces uniqueness */
+	isUnique(): boolean
+
+	/** Check if the index is multi-entry */
+	isMultiEntry(): boolean
+
+	/** Get record(s) by index key */
+	get(key: ValidKey): Promise<T | undefined>
+	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
+
+	/** Get record(s) by index key, throwing if not found */
+	resolve(key: ValidKey): Promise<T>
+	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
+
+	/** Check if record(s) exist by index key */
+	has(key: ValidKey): Promise<boolean>
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
+	/** Get the primary key for an index key */
+	getKey(key: ValidKey): Promise<ValidKey | undefined>
+
+	/** Get all records matching a query */
+	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
+
+	/** Get all keys matching a query */
+	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
+
+	/** Count records matching a query */
+	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
+
+	/** Open a cursor */
+	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
+
+	/** Open a key cursor */
+	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
+}
+
+/**
  * Store interface within a transaction context.
  *
  * @remarks
@@ -1014,6 +1224,12 @@ export interface TransactionStoreInterface<T> {
 	remove(key: ValidKey): Promise<void>
 	remove(keys: readonly ValidKey[]): Promise<void>
 
+	// ─── Has ─────────────────────────────────────────────────
+
+	/** Check if record(s) exist by primary key */
+	has(key: ValidKey): Promise<boolean>
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
 	// ─── Bulk Operations ─────────────────────────────────────
 
 	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
@@ -1023,7 +1239,8 @@ export interface TransactionStoreInterface<T> {
 
 	// ─── Index Access ────────────────────────────────────────
 
-	index(name: string): IndexInterface<T>
+	/** Get an index bound to this transaction */
+	index(name: string): TransactionIndexInterface<T>
 
 	// ─── Cursor ──────────────────────────────────────────────
 

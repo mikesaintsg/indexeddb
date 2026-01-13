@@ -25,6 +25,9 @@ import type {
 	BlockedCallback,
 	Unsubscribe,
 	Migration,
+	ExportedData,
+	ImportOptions,
+	StorageEstimate,
 } from '../types.js'
 import {
 	OpenError,
@@ -88,12 +91,6 @@ implements DatabaseInterface<Schema> {
 				this.#handleRemoteChange(event.data)
 			}
 		}
-
-		this.#name = options.name
-		this.#version = options.version
-		this.#storeDefinitions = options.stores
-		this.#migrations = options.migrations ?? []
-		this.#onBlocked = options.onBlocked
 
 		if (options.onChange) this.#changeListeners.add(options.onChange)
 		if (options.onError) this.#errorListeners.add(options.onError)
@@ -243,6 +240,83 @@ implements DatabaseInterface<Schema> {
 			request.onerror = () => reject(wrapError(request.error))
 			request.onblocked = () => { /* wait for other connections */ }
 		})
+	}
+
+	// ─── Export/Import ───────────────────────────────────────
+
+	/**
+	 * Export all data from the database.
+	 */
+	async export(): Promise<ExportedData<Schema>> {
+		const db = await this.ensureOpen()
+		const storeNames = Object.keys(this.#storeDefinitions) as (keyof Schema & string)[]
+
+		const stores = {} as { [K in keyof Schema]: readonly Schema[K][] }
+
+		for (const name of storeNames) {
+			const tx = db.transaction([name], 'readonly')
+			const store = tx.objectStore(name)
+			const request = store.getAll()
+			const data = await this.#promisifyRequest(request)
+			stores[name] = data as Schema[typeof name][]
+		}
+
+		return {
+			name: this.#name,
+			version: this.#version,
+			exportedAt: new Date().toISOString(),
+			stores,
+		}
+	}
+
+	/**
+	 * Import data into the database.
+	 */
+	async import(data: ExportedData<Schema>, options?: ImportOptions): Promise<void> {
+		const db = await this.ensureOpen()
+		const mode = options?.mode ?? 'merge'
+		const onProgress = options?.onProgress
+
+		for (const [storeName, records] of Object.entries(data.stores) as [keyof Schema & string, Schema[keyof Schema][]][]) {
+			if (!(storeName in this.#storeDefinitions)) {
+				continue // Skip unknown stores
+			}
+
+			const tx = db.transaction([storeName], 'readwrite')
+			const store = tx.objectStore(storeName)
+
+			if (mode === 'replace') {
+				await this.#promisifyRequest(store.clear())
+			}
+
+			const total = records.length
+			for (let i = 0; i < total; i++) {
+				await this.#promisifyRequest(store.put(records[i]))
+				if (onProgress) {
+					onProgress(storeName, i + 1, total)
+				}
+			}
+
+			await promisifyTransaction(tx)
+		}
+	}
+
+	// ─── Storage ─────────────────────────────────────────────
+
+	/**
+	 * Get storage estimate for this origin.
+	 */
+	async getStorageEstimate(): Promise<StorageEstimate> {
+		if (!navigator?.storage?.estimate) {
+			return { usage: 0, quota: 0, percentUsed: 0 }
+		}
+
+		const estimate = await navigator.storage.estimate()
+		const usage = estimate.usage ?? 0
+		const quota = estimate.quota ?? 0
+		const percentUsed = quota > 0 ? (usage / quota) * 100 : 0
+
+		return { usage, quota, percentUsed }
 	}
 
 	// ─── Subscriptions ───────────────────────────────────────
@@ -459,5 +533,12 @@ implements DatabaseInterface<Schema> {
 		for (const callback of this.#errorListeners) {
 			try { callback(error) } catch { /* ignore */ }
 		}
+	}
+
+	#promisifyRequest<R>(request: IDBRequest<R>): Promise<R> {
+		return new Promise((resolve, reject) => {
+			request.onsuccess = () => resolve(request.result)
+			request.onerror = () => reject(wrapError(request.error))
+		})
 	}
 }

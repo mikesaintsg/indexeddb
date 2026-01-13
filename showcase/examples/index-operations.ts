@@ -221,6 +221,50 @@ const between25And35 = await ageIndex.all(IDBKeyRange.bound(25, 35))
 }
 
 /**
+ * Demonstrates Index.has() - Existence check by index key
+ */
+export async function demonstrateIndexHas(db: DatabaseInterface<AppSchema>): Promise<ExampleResult> {
+	const store = db.store('users')
+	const emailIndex = store.index('byEmail')
+
+	// Check if record exists by index key
+	const exists = await emailIndex.has('alice@example.com')
+	const missing = await emailIndex.has('nonexistent@example.com')
+
+	// Batch check
+	const checks = await emailIndex.has([
+		'alice@example.com',
+		'bob@example.com',
+		'nonexistent@example.com',
+	])
+
+	return {
+		success: true,
+		message: 'Index has() checks existence by index key',
+		data: {
+			exists,
+			missing,
+			batchChecks: checks,
+		},
+		code: `
+const emailIndex = store.index('byEmail')
+
+// Check if record exists by index key
+const exists = await emailIndex.has('alice@example.com')  // true
+const missing = await emailIndex.has('nonexistent@example.com')  // false
+
+// Batch check - returns array of booleans
+const checks = await emailIndex.has([
+  'alice@example.com',
+  'bob@example.com',
+  'nonexistent@example.com'
+])
+// [true, true, false]
+`.trim(),
+	}
+}
+
+/**
  * Demonstrates native index access
  */
 export function demonstrateNativeIndexAccess(db: DatabaseInterface<AppSchema>): ExampleResult {

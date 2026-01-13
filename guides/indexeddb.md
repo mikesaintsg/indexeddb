@@ -1315,6 +1315,237 @@ for await (const user of store.iterate()) {
 }
 ```
 
+### 8. Progress Callbacks for Bulk Operations
+
+Track progress when inserting large datasets:
+
+```typescript
+const users = generateLargeDataset(10000)
+
+await store.set(users, {
+	onProgress: (current, total) => {
+		const percent = Math.round((current / total) * 100)
+		console.log(`Importing: ${percent}%`)
+	}
+})
+```
+
+---
+
+## Export & Import
+
+### Exporting Data
+
+Export all database contents for backup:
+
+```typescript
+const backup = await db.export()
+// backup.stores contains all records by store name
+console.log(`Exported at: ${backup.exportedAt}`)
+
+// Save to file or localStorage
+const json = JSON.stringify(backup)
+localStorage.setItem('backup', json)
+```
+
+### Importing Data
+
+Restore data from an export:
+
+```typescript
+const json = localStorage.getItem('backup')
+const backup = JSON.parse(json)
+
+// Merge mode (default): adds/updates records, keeps existing
+await db.import(backup)
+
+// Replace mode: clears stores before importing
+await db.import(backup, { mode: 'replace' })
+
+// With progress tracking
+await db.import(backup, {
+	mode: 'replace',
+	onProgress: (storeName, current, total) => {
+		console.log(`${storeName}: ${current}/${total}`)
+	}
+})
+```
+
+---
+
+## Storage Management
+
+### Checking Storage Usage
+
+Monitor storage quota using the Storage API:
+
+```typescript
+const estimate = await db.getStorageEstimate()
+
+console.log(`Used: ${(estimate.usage / 1024 / 1024).toFixed(2)} MB`)
+console.log(`Quota: ${(estimate.quota / 1024 / 1024).toFixed(2)} MB`)
+console.log(`Usage: ${estimate.percentUsed.toFixed(1)}%`)
+
+if (estimate.percentUsed > 80) {
+	console.warn('Storage nearly full!')
+}
+```
+
+---
+
+## Compound Indexes
+
+### Defining Compound Indexes
+
+Compound indexes allow querying by multiple fields:
+
+```typescript
+const db = await createDatabase<MySchema>({
+	name: 'events',
+	version: 1,
+	stores: {
+		events: {
+			indexes: [
+				// Compound index on year, month, day
+				{ name: 'byDate', keyPath: ['year', 'month', 'day'] },
+				// Compound index on category and date
+				{ name: 'byCategoryDate', keyPath: ['category', 'year', 'month'] }
+			]
+		}
+	}
+})
+```
+
+### Querying Compound Indexes
+
+Use `IDBKeyRange` for compound key queries:
+
+```typescript
+const index = db.store('events').index('byDate')
+
+// Exact match with IDBKeyRange.only
+const range = IDBKeyRange.only([2024, 1, 15])
+const events = await index.all(range)
+
+// Range query
+const q1Range = IDBKeyRange.bound([2024, 1, 1], [2024, 3, 31])
+const q1Events = await index.all(q1Range)
+
+// Batch operations with compound keys
+const results = await index.get([
+	[2024, 1, 15],  // Compound key 1
+	[2024, 2, 14],  // Compound key 2
+])
+```
+
+### Compound Key Ordering
+
+Records are sorted by compound key components in order:
+
+```typescript
+// For keyPath: ['year', 'month', 'day']
+// Sorting order: year first, then month, then day
+// [2024, 1, 10] < [2024, 1, 15] < [2024, 2, 1]
+```
+
+---
+
+## Binary Keys
+
+IndexedDB supports binary data as keys:
+
+```typescript
+// ArrayBuffer as key
+const buffer = new ArrayBuffer(16)
+await store.set(value, buffer)
+
+// TypedArray as key
+const key = new Uint8Array([1, 2, 3, 4])
+await store.set(value, key)
+
+// Checking key equality
+import { keysEqual } from '@mikesaintsg/indexeddb'
+
+const a = new Uint8Array([1, 2, 3])
+const b = new Uint8Array([1, 2, 3])
+keysEqual(a, b) // true
+```
+
+---
+
+## Transaction Atomicity
+
+### Guarantees
+
+All operations within a transaction are atomic:
+
+```typescript
+await db.write(['users', 'posts'], async (tx) => {
+	// Either ALL of these succeed, or NONE of them do
+	await tx.store('users').set(user)
+	await tx.store('posts').set(post1)
+	await tx.store('posts').set(post2)
+	
+	if (someCondition) {
+		tx.abort() // Rolls back everything
+	}
+})
+```
+
+### Transaction Isolation
+
+Each transaction sees a consistent snapshot:
+
+```typescript
+// Transaction 1
+await db.write(['users'], async (tx) => {
+	const user = await tx.store('users').get('u1')
+	// ... other tabs can't see changes until commit
+	await tx.store('users').set({ ...user, updated: true })
+})
+// Changes visible only after commit
+```
+
+### Transaction Scope
+
+Transactions are scoped to specific stores:
+
+```typescript
+// ✅ Correct: specify all stores you'll access
+await db.write(['users', 'posts'], async (tx) => {
+	await tx.store('users').set(user)
+	await tx.store('posts').set(post)
+})
+
+// ❌ Wrong: accessing store not in scope
+await db.write(['users'], async (tx) => {
+	await tx.store('posts').set(post) // Error: store not in scope
+})
+```
+
+---
+
+## TransactionIndex
+
+When using indexes within transactions, use `TransactionIndex`:
+
+```typescript
+await db.read(['users'], async (tx) => {
+	const store = tx.store('users')
+	const index = store.index('byEmail')
+	
+	// TransactionIndex provides:
+	// - get(), resolve(), has()
+	// - getKey(), all(), keys(), count()
+	// - openCursor(), openKeyCursor()
+	
+	const user = await index.all(IDBKeyRange.only('alice@test.com'))
+	const exists = await index.has(['alice@test.com', 'bob@test.com'])
+})
+```
+
+Note: `TransactionIndex` does not include `query()`, `iterate()`, or `iterateKeys()` as these require transaction lifecycle control that conflicts with explicit transactions.
+
 ---
 
 ## API Reference
@@ -1351,21 +1582,24 @@ Creates or opens a database connection.
 
 #### Methods
 
-| Method                               | Returns             | Description                  |
-|--------------------------------------|---------------------|------------------------------|
-| `getName()`                          | `string`            | Database name                |
-| `getVersion()`                       | `number`            | Database version             |
-| `getStoreNames()`                    | `readonly string[]` | All store names              |
-| `isOpen()`                           | `boolean`           | Connection status            |
-| `store(name)`                        | `StoreInterface<T>` | Get store interface          |
-| `read(stores, operation)`            | `Promise<void>`     | Read transaction             |
-| `write(stores, operation, options?)` | `Promise<void>`     | Write transaction            |
-| `close()`                            | `void`              | Close connection             |
-| `drop()`                             | `Promise<void>`     | Delete database              |
-| `onChange(callback)`                 | `Unsubscribe`       | Subscribe to changes         |
-| `onError(callback)`                  | `Unsubscribe`       | Subscribe to errors          |
-| `onVersionChange(callback)`          | `Unsubscribe`       | Subscribe to version changes |
-| `onClose(callback)`                  | `Unsubscribe`       | Subscribe to close           |
+| Method                               | Returns                    | Description                  |
+|--------------------------------------|----------------------------|------------------------------|
+| `getName()`                          | `string`                   | Database name                |
+| `getVersion()`                       | `number`                   | Database version             |
+| `getStoreNames()`                    | `readonly string[]`        | All store names              |
+| `isOpen()`                           | `boolean`                  | Connection status            |
+| `store(name)`                        | `StoreInterface<T>`        | Get store interface          |
+| `read(stores, operation)`            | `Promise<void>`            | Read transaction             |
+| `write(stores, operation, options?)` | `Promise<void>`            | Write transaction            |
+| `close()`                            | `void`                     | Close connection             |
+| `drop()`                             | `Promise<void>`            | Delete database              |
+| `export()`                           | `Promise<ExportedData>`    | Export all data              |
+| `import(data, options?)`             | `Promise<void>`            | Import data                  |
+| `getStorageEstimate()`               | `Promise<StorageEstimate>` | Get storage usage info       |
+| `onChange(callback)`                 | `Unsubscribe`              | Subscribe to changes         |
+| `onError(callback)`                  | `Unsubscribe`              | Subscribe to errors          |
+| `onVersionChange(callback)`          | `Unsubscribe`              | Subscribe to version changes |
+| `onClose(callback)`                  | `Unsubscribe`              | Subscribe to close           |
 
 ---
 
@@ -1431,6 +1665,8 @@ Creates or opens a database connection.
 | `get(keys)`               | `Promise<readonly (T \| undefined)[]>` | Get multiple      |
 | `resolve(key)`            | `Promise<T>`                           | Get or throw      |
 | `resolve(keys)`           | `Promise<readonly T[]>`                | Get all or throw  |
+| `has(key)`                | `Promise<boolean>`                     | Check existence   |
+| `has(keys)`               | `Promise<readonly boolean[]>`          | Batch check       |
 | `getKey(key)`             | `Promise<ValidKey \| undefined>`       | Get primary key   |
 | `all(query?, count?)`     | `Promise<readonly T[]>`                | Get all           |
 | `keys(query?, count?)`    | `Promise<readonly ValidKey[]>`         | Get primary keys  |
@@ -1537,6 +1773,28 @@ type OrderDirection = 'ascending' | 'descending'
 type ChangeType = 'set' | 'add' | 'remove' | 'clear'
 type ChangeSource = 'local' | 'remote'
 type Unsubscribe = () => void
+
+interface BulkOperationOptions {
+	readonly onProgress?: (current: number, total: number) => void
+}
+
+interface ExportedData<Schema> {
+	readonly name: string
+	readonly version: number
+	readonly exportedAt: string
+	readonly stores: { [K in keyof Schema]: readonly Schema[K][] }
+}
+
+interface ImportOptions {
+	readonly mode?: 'merge' | 'replace'
+	readonly onProgress?: (storeName: string, current: number, total: number) => void
+}
+
+interface StorageEstimate {
+	readonly usage: number
+	readonly quota: number
+	readonly percentUsed: number
+}
 ```
 
 ---
