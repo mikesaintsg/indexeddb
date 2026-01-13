@@ -463,4 +463,50 @@ describe('Index', () => {
 			expect(results).toHaveLength(2)
 		})
 	})
+
+	// ─── has() Method ────────────────────────────────────────
+
+	describe('has', () => {
+		it('returns true for existing key', async () => {
+			const index = db.store('users').index('byEmail')
+			await db.store('users').set({ id: 'u1', name: 'Alice', email: 'alice@example.com', status: 'active', role: 'admin' })
+
+			const exists = await index.has('alice@example.com')
+
+			expect(exists).toBe(true)
+		})
+
+		it('returns false for non-existing key', async () => {
+			const index = db.store('users').index('byEmail')
+
+			const exists = await index.has('nonexistent@example.com')
+
+			expect(exists).toBe(false)
+		})
+
+		it('checks multiple keys', async () => {
+			const index = db.store('users').index('byEmail')
+			await db.store('users').set([
+				{ id: 'u1', name: 'Alice', email: 'alice@example.com', status: 'active', role: 'admin' },
+				{ id: 'u2', name: 'Bob', email: 'bob@example.com', status: 'inactive', role: 'user' },
+			])
+
+			const exists = await index.has(['alice@example.com', 'bob@example.com', 'nonexistent@example.com'])
+
+			expect(exists).toEqual([true, true, false])
+		})
+
+		it('works in transaction', async () => {
+			await db.store('users').set({ id: 'u1', name: 'Alice', email: 'alice@example.com', status: 'active', role: 'admin' })
+
+			let hasAlice = false
+
+			await db.read(['users'], async (tx) => {
+				const index = tx.store('users').index('byEmail')
+				hasAlice = await index.has('alice@example.com')
+			})
+
+			expect(hasAlice).toBe(true)
+		})
+	})
 })

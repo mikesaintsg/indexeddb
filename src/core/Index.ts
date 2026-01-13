@@ -150,6 +150,29 @@ export class Index<T> implements IndexInterface<T> {
 		return this.#request(index.count(query as IDBValidKey | IDBKeyRange | undefined))
 	}
 
+	// ─── Existence Checks ────────────────────────────────────
+
+	has(key: ValidKey): Promise<boolean>
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+	async has(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<boolean | readonly boolean[]> {
+		const db = await this.#ensureOpen()
+		const tx = db.transaction([this.#storeName], 'readonly')
+		const store = tx.objectStore(this.#storeName)
+		const index = store.index(this.#indexName)
+
+		if (Array.isArray(keyOrKeys)) {
+			return await Promise.all(
+				keyOrKeys.map(async k => {
+					const count = await this.#request(index.count(k))
+					return count > 0
+				}),
+			)
+		}
+
+		const count = await this.#request(index.count(keyOrKeys as IDBValidKey))
+		return count > 0
+	}
+
 	// ─── Query Builder ───────────────────────────────────────
 
 	query(): QueryBuilderInterface<T> {

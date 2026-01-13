@@ -136,6 +136,24 @@ export class TransactionStore<T> implements TransactionStoreInterface<T> {
 		return this.#request(this.#store.count(query as IDBValidKey | IDBKeyRange | undefined))
 	}
 
+	// ─── Existence Checks ────────────────────────────────────
+
+	has(key: ValidKey): Promise<boolean>
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+	async has(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<boolean | readonly boolean[]> {
+		if (Array.isArray(keyOrKeys)) {
+			return Promise.all(
+				keyOrKeys.map(async k => {
+					const count = await this.#request(this.#store.count(k))
+					return count > 0
+				}),
+			)
+		}
+
+		const count = await this.#request(this.#store.count(keyOrKeys as IDBValidKey))
+		return count > 0
+	}
+
 	// ─── Index Access ────────────────────────────────────────
 
 	index(name: string): TransactionIndexInterface<T> {

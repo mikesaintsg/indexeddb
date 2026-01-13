@@ -866,6 +866,35 @@ export interface IndexInterface<T> {
 	 */
 	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
 
+	// ─── Existence Checks ────────────────────────────────────
+
+	/**
+	 * Check if a record exists with the given index key.
+	 *
+	 * @param key - The index key to check
+	 * @returns true if a record exists with this key
+	 *
+	 * @example
+	 * ```ts
+	 * const exists = await index.has('alice@example.com')
+	 * ```
+	 */
+	has(key: ValidKey): Promise<boolean>
+
+	/**
+	 * Check if records exist for multiple index keys.
+	 *
+	 * @param keys - Array of index keys to check
+	 * @returns Array of booleans indicating existence
+	 *
+	 * @example
+	 * ```ts
+	 * const exists = await index.has(['key1', 'key2', 'key3'])
+	 * // [true, false, true]
+	 * ```
+	 */
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
 	// ─── Query Builder ───────────────────────────────────────
 
 	/**
@@ -1015,6 +1044,24 @@ export interface TransactionIndexInterface<T> {
 	 */
 	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
 
+	// ─── Existence Checks ────────────────────────────────────
+
+	/**
+	 * Check if a record exists with the given index key.
+	 *
+	 * @param key - The index key to check
+	 * @returns true if a record exists with this key
+	 */
+	has(key: ValidKey): Promise<boolean>
+
+	/**
+	 * Check if records exist for multiple index keys.
+	 *
+	 * @param keys - Array of index keys to check
+	 * @returns Array of booleans indicating existence
+	 */
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
 	// ─── Cursor (Manual) ─────────────────────────────────────
 
 	/**
@@ -1142,6 +1189,24 @@ export interface TransactionStoreInterface<T> {
 	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
 	clear(): Promise<void>
 	count(query?:  IDBKeyRange | ValidKey | null): Promise<number>
+
+	// ─── Existence Checks ────────────────────────────────────
+
+	/**
+	 * Check if a record exists with the given key.
+	 *
+	 * @param key - The key to check
+	 * @returns true if a record exists with this key
+	 */
+	has(key: ValidKey): Promise<boolean>
+
+	/**
+	 * Check if records exist for multiple keys.
+	 *
+	 * @param keys - Array of keys to check
+	 * @returns Array of booleans indicating existence
+	 */
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
 
 	// ─── Index Access ────────────────────────────────────────
 

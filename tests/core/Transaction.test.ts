@@ -429,6 +429,41 @@ describe('Transaction', () => {
 				expect(tx.store('users').native).toBeInstanceOf(IDBObjectStore)
 			})
 		})
+
+		it('has() returns true for existing key', async () => {
+			await db.write(['users'], async (tx) => {
+				const store = tx.store('users')
+				await store.set({ id: 'u1', name: 'Alice', email: 'alice@example.com' })
+
+				const exists = await store.has('u1')
+
+				expect(exists).toBe(true)
+			})
+		})
+
+		it('has() returns false for non-existing key', async () => {
+			await db.read(['users'], async (tx) => {
+				const store = tx.store('users')
+
+				const exists = await store.has('nonexistent')
+
+				expect(exists).toBe(false)
+			})
+		})
+
+		it('has() checks multiple keys', async () => {
+			await db.write(['users'], async (tx) => {
+				const store = tx.store('users')
+				await store.set([
+					{ id: 'u1', name: 'Alice', email: 'alice@example.com' },
+					{ id: 'u2', name: 'Bob', email: 'bob@example.com' },
+				])
+
+				const exists = await store.has(['u1', 'u2', 'u3'])
+
+				expect(exists).toEqual([true, true, false])
+			})
+		})
 	})
 
 	// ─── Complex Scenarios ───────────────────────────────────

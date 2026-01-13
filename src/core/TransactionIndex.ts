@@ -124,6 +124,24 @@ export class TransactionIndex<T> implements TransactionIndexInterface<T> {
 		return this.#request(this.#index.count(query as IDBValidKey | IDBKeyRange | undefined))
 	}
 
+	// ─── Existence Checks ────────────────────────────────────
+
+	has(key: ValidKey): Promise<boolean>
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+	async has(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<boolean | readonly boolean[]> {
+		if (Array.isArray(keyOrKeys)) {
+			return Promise.all(
+				keyOrKeys.map(async k => {
+					const count = await this.#request(this.#index.count(k))
+					return count > 0
+				}),
+			)
+		}
+
+		const count = await this.#request(this.#index.count(keyOrKeys as IDBValidKey))
+		return count > 0
+	}
+
 	// ─── Cursors ─────────────────────────────────────────────
 
 	async openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null> {
