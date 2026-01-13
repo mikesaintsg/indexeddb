@@ -15,7 +15,7 @@ import type {
 	ValidKey,
 	BetweenOptions,
 } from '../types.js'
-import { toIDBCursorDirection, isValidKey } from '../helpers.js'
+import { toIDBCursorDirection, isValidKey, extractKey } from '../helpers.js'
 import { wrapError } from '../errors.js'
 
 /** Internal query state */
@@ -421,7 +421,7 @@ export class QueryBuilder<T> implements QueryBuilderInterface<T> {
 			return undefined
 		}
 
-		return (item as Record<string, unknown>)[keyPath] as ValidKey | undefined
+		return extractKey(item, keyPath)
 	}
 
 	#applyLimitOffset<U>(items: U[]): U[] {

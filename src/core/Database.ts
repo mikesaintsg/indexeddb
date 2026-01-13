@@ -89,12 +89,6 @@ implements DatabaseInterface<Schema> {
 			}
 		}
 
-		this.#name = options.name
-		this.#version = options.version
-		this.#storeDefinitions = options.stores
-		this.#migrations = options.migrations ?? []
-		this.#onBlocked = options.onBlocked
-
 		if (options.onChange) this.#changeListeners.add(options.onChange)
 		if (options.onError) this.#errorListeners.add(options.onError)
 		if (options.onVersionChange) this.#versionChangeListeners.add(options.onVersionChange)
