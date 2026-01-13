@@ -63,7 +63,7 @@ export class TransactionIndex<T> {
 	 */
 	getKeyPath(): KeyPath {
 		const kp = this.#index.keyPath
-		return Array.isArray(kp) ? kp : kp as string
+		return Array.isArray(kp) ? kp : kp
 	}
 
 	/**
