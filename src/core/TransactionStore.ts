@@ -10,18 +10,17 @@
 
 import type {
 	TransactionStoreInterface,
+	TransactionIndexInterface,
 	ValidKey,
-	IndexInterface,
 	CursorInterface,
 	KeyCursorInterface,
 	CursorOptions,
-	IndexDefinition,
 } from '../types.js'
 import { NotFoundError, wrapError } from '../errors.js'
 import { toIDBCursorDirection } from '../helpers.js'
-import { Index } from './Index.js'
 import { Cursor } from './Cursor.js'
 import { KeyCursor } from './KeyCursor.js'
+import { TransactionIndex } from './TransactionIndex.js'
 
 /**
  * Store operations bound to a transaction.
@@ -118,6 +117,38 @@ export class TransactionStore<T> implements TransactionStoreInterface<T> {
 		await this.#request(this.#store.delete(keyOrKeys as IDBValidKey))
 	}
 
+	// ─── Has ─────────────────────────────────────────────────
+
+	/**
+	 * Check if a record exists by primary key.
+	 *
+	 * @param key - The key to check
+	 * @returns true if record exists
+	 */
+	has(key: ValidKey): Promise<boolean>
+
+	/**
+	 * Check if records exist by primary keys.
+	 *
+	 * @param keys - The keys to check
+	 * @returns Array of booleans indicating existence
+	 */
+	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
+
+	async has(keyOrKeys: ValidKey | readonly ValidKey[]): Promise<boolean | readonly boolean[]> {
+		if (Array.isArray(keyOrKeys)) {
+			return Promise.all(
+				keyOrKeys.map(async k => {
+					const count = await this.#request(this.#store.count(k))
+					return count > 0
+				}),
+			)
+		}
+
+		const count = await this.#request(this.#store.count(keyOrKeys as IDBValidKey))
+		return count > 0
+	}
+
 	// ─── Bulk Operations ─────────────────────────────────────
 
 	async all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]> {
@@ -138,29 +169,24 @@ export class TransactionStore<T> implements TransactionStoreInterface<T> {
 
 	// ─── Index Access ────────────────────────────────────────
 
-	index(name: string): IndexInterface<T> {
-		// Verify index exists
+	/**
+	 * Get an index bound to this transaction.
+	 *
+	 * @param name - Index name
+	 * @returns TransactionIndex for atomic operations
+	 *
+	 * @remarks
+	 * Returns a TransactionIndex that operates within the parent transaction,
+	 * maintaining atomicity guarantees. Unlike standalone Index, this does not
+	 * create new transactions.
+	 */
+	index(name: string): TransactionIndexInterface<T> {
 		if (!this.#store.indexNames.contains(name)) {
 			throw new Error(`Index "${name}" not found on store "${this.#storeName}"`)
 		}
 
 		const nativeIndex = this.#store.index(name)
-		const definition: IndexDefinition = {
-			name: nativeIndex.name,
-			keyPath: nativeIndex.keyPath as string,
-			unique: nativeIndex.unique,
-			multiEntry: nativeIndex.multiEntry,
-		}
-
-		// Create a mock ensureOpen that returns the current transaction's database
-		// This is a bit of a hack but works because we're already in a transaction
-		const db = this.#store.transaction.db
-		return new Index<T>(
-			this.#storeName,
-			name,
-			definition,
-			() => Promise.resolve(db),
-		)
+		return new TransactionIndex<T>(nativeIndex, this.#storeName)
 	}
 
 	// ─── Cursors ─────────────────────────────────────────────

@@ -9,6 +9,7 @@
  */
 
 import type {
+	BulkOperationOptions,
 	ChangeEvent,
 	CursorInterface,
 	CursorOptions,
@@ -139,21 +140,34 @@ export class Store<T> implements StoreInterface<T> {
 	// ─── Set ─────────────────────────────────────────────────
 
 	set(value: T, key?: ValidKey): Promise<ValidKey>
-	set(values: readonly T[]): Promise<readonly ValidKey[]>
-	async set(valueOrValues: T | readonly T[], key?: ValidKey): Promise<ValidKey | readonly ValidKey[]> {
+	set(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
+	async set(
+		valueOrValues: T | readonly T[],
+		keyOrOptions?: ValidKey | BulkOperationOptions,
+	): Promise<ValidKey | readonly ValidKey[]> {
 		const db = await this.#database.ensureOpen()
 		const tx = db.transaction([this.#name], 'readwrite')
 		const store = tx.objectStore(this.#name)
 
 		if (Array.isArray(valueOrValues)) {
-			const keys = await Promise.all(
-				valueOrValues.map(v => this.#request(store.put(v))),
-			)
+			const options = keyOrOptions as BulkOperationOptions | undefined
+			const onProgress = options?.onProgress
+			const total = valueOrValues.length
+			const keys: ValidKey[] = []
+
+			for (let i = 0; i < total; i++) {
+				const key = await this.#request(store.put(valueOrValues[i]))
+				keys.push(key)
+				if (onProgress) {
+					onProgress(i + 1, total)
+				}
+			}
 			await this.#awaitTransaction(tx)
 			this.#emitChange('set', keys)
 			return keys as readonly ValidKey[]
 		}
 
+		const key = keyOrOptions as ValidKey | undefined
 		const resultKey = await this.#request(store.put(valueOrValues, key))
 		await this.#awaitTransaction(tx)
 		this.#emitChange('set', [resultKey])
@@ -163,21 +177,34 @@ export class Store<T> implements StoreInterface<T> {
 	// ─── Add ─────────────────────────────────────────────────
 
 	add(value: T, key?: ValidKey): Promise<ValidKey>
-	add(values: readonly T[]): Promise<readonly ValidKey[]>
-	async add(valueOrValues: T | readonly T[], key?: ValidKey): Promise<ValidKey | readonly ValidKey[]> {
+	add(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
+	async add(
+		valueOrValues: T | readonly T[],
+		keyOrOptions?: ValidKey | BulkOperationOptions,
+	): Promise<ValidKey | readonly ValidKey[]> {
 		const db = await this.#database.ensureOpen()
 		const tx = db.transaction([this.#name], 'readwrite')
 		const store = tx.objectStore(this.#name)
 
 		if (Array.isArray(valueOrValues)) {
-			const keys = await Promise.all(
-				valueOrValues.map(v => this.#request(store.add(v))),
-			)
+			const options = keyOrOptions as BulkOperationOptions | undefined
+			const onProgress = options?.onProgress
+			const total = valueOrValues.length
+			const keys: ValidKey[] = []
+
+			for (let i = 0; i < total; i++) {
+				const key = await this.#request(store.add(valueOrValues[i]))
+				keys.push(key)
+				if (onProgress) {
+					onProgress(i + 1, total)
+				}
+			}
 			await this.#awaitTransaction(tx)
 			this.#emitChange('add', keys)
 			return keys as readonly ValidKey[]
 		}
 
+		const key = keyOrOptions as ValidKey | undefined
 		const resultKey = await this.#request(store.add(valueOrValues, key))
 		await this.#awaitTransaction(tx)
 		this.#emitChange('add', [resultKey])
