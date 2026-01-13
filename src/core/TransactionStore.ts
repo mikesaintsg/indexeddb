@@ -10,8 +10,8 @@
 
 import type {
 	TransactionStoreInterface,
+	TransactionIndexInterface,
 	ValidKey,
-	IndexInterface,
 	CursorInterface,
 	KeyCursorInterface,
 	CursorOptions,
@@ -19,7 +19,7 @@ import type {
 } from '../types.js'
 import { NotFoundError, wrapError } from '../errors.js'
 import { toIDBCursorDirection } from '../helpers.js'
-import { Index } from './Index.js'
+import { TransactionIndex } from './TransactionIndex.js'
 import { Cursor } from './Cursor.js'
 import { KeyCursor } from './KeyCursor.js'
 
@@ -138,7 +138,7 @@ export class TransactionStore<T> implements TransactionStoreInterface<T> {
 
 	// ─── Index Access ────────────────────────────────────────
 
-	index(name: string): IndexInterface<T> {
+	index(name: string): TransactionIndexInterface<T> {
 		// Verify index exists
 		if (!this.#store.indexNames.contains(name)) {
 			throw new Error(`Index "${name}" not found on store "${this.#storeName}"`)
@@ -147,19 +147,16 @@ export class TransactionStore<T> implements TransactionStoreInterface<T> {
 		const nativeIndex = this.#store.index(name)
 		const definition: IndexDefinition = {
 			name: nativeIndex.name,
-			keyPath: nativeIndex.keyPath as string,
+			keyPath: nativeIndex.keyPath as string | readonly string[],
 			unique: nativeIndex.unique,
 			multiEntry: nativeIndex.multiEntry,
 		}
 
-		// Create a mock ensureOpen that returns the current transaction's database
-		// This is a bit of a hack but works because we're already in a transaction
-		const db = this.#store.transaction.db
-		return new Index<T>(
+		return new TransactionIndex<T>(
+			nativeIndex,
 			this.#storeName,
 			name,
 			definition,
-			() => Promise.resolve(db),
 		)
 	}
 

@@ -913,6 +913,128 @@ export interface IndexInterface<T> {
 }
 
 /**
+ * Index interface within a transaction context.
+ *
+ * @remarks
+ * Similar to IndexInterface but all operations are bound to
+ * the parent transaction. Does NOT create new transactions.
+ * Excludes query(), iterate(), and iterateKeys() which would
+ * create separate transactions.
+ */
+export interface TransactionIndexInterface<T> {
+	/** Native IDBIndex instance */
+	readonly native: IDBIndex
+
+	// ─── Accessors ───────────────────────────────────────────
+
+	/** Get the index name */
+	getName(): string
+
+	/** Get the index key path */
+	getKeyPath(): KeyPath
+
+	/** Check if the index enforces uniqueness */
+	isUnique(): boolean
+
+	/** Check if the index is multi-entry */
+	isMultiEntry(): boolean
+
+	// ─── Get (undefined for missing) ─────────────────────────
+
+	/**
+	 * Get a record by index key.
+	 *
+	 * @param key - The index key to look up
+	 * @returns The record, or undefined if not found
+	 */
+	get(key: ValidKey): Promise<T | undefined>
+
+	/**
+	 * Get multiple records by index keys.
+	 *
+	 * @param keys - Array of index keys to look up
+	 * @returns Array of records (undefined for missing keys)
+	 */
+	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
+
+	// ─── Resolve (throws for missing) ────────────────────────
+
+	/**
+	 * Get a record by index key, throwing if not found.
+	 *
+	 * @param key - The index key to look up
+	 * @returns The record (guaranteed to exist)
+	 * @throws NotFoundError if record doesn't exist
+	 */
+	resolve(key: ValidKey): Promise<T>
+
+	/**
+	 * Get multiple records by index keys, throwing if any are missing.
+	 *
+	 * @param keys - Array of index keys to look up
+	 * @returns Array of records (all guaranteed to exist)
+	 * @throws NotFoundError if any record doesn't exist
+	 */
+	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
+
+	// ─── Primary Key Lookup ──────────────────────────────────
+
+	/**
+	 * Get the primary key for an index key.
+	 *
+	 * @param key - The index key to look up
+	 * @returns The primary key, or undefined if not found
+	 */
+	getKey(key: ValidKey): Promise<ValidKey | undefined>
+
+	// ─── Bulk Operations ─────────────────────────────────────
+
+	/**
+	 * Get all records matching a query.
+	 *
+	 * @param query - Optional key range filter
+	 * @param count - Optional maximum number of records
+	 * @returns Array of matching records
+	 */
+	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
+
+	/**
+	 * Get all primary keys matching a query.
+	 *
+	 * @param query - Optional key range filter
+	 * @param count - Optional maximum number of keys
+	 * @returns Array of matching primary keys
+	 */
+	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
+
+	/**
+	 * Count records matching a query.
+	 *
+	 * @param query - Optional key range or specific key
+	 * @returns Number of matching records
+	 */
+	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
+
+	// ─── Cursor (Manual) ─────────────────────────────────────
+
+	/**
+	 * Open a cursor on this index.
+	 *
+	 * @param options - Cursor options
+	 * @returns Cursor interface, or null if no records
+	 */
+	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
+
+	/**
+	 * Open a key-only cursor on this index.
+	 *
+	 * @param options - Cursor options
+	 * @returns Key cursor interface, or null if no records
+	 */
+	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
+}
+
+/**
  * Transaction interface for explicit transaction control.
  *
  * @remarks
@@ -1023,7 +1145,7 @@ export interface TransactionStoreInterface<T> {
 
 	// ─── Index Access ────────────────────────────────────────
 
-	index(name: string): IndexInterface<T>
+	index(name: string): TransactionIndexInterface<T>
 
 	// ─── Cursor ──────────────────────────────────────────────
 

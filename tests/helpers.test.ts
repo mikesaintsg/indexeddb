@@ -241,6 +241,24 @@ describe('extractKey', () => {
 			const obj = { tags: ['a', 'b'] }
 			expect(extractKey(obj, 'tags')).toEqual(['a', 'b'])
 		})
+
+		it('extracts ArrayBuffer keys', () => {
+			const buffer = new Uint8Array([1, 2, 3]).buffer
+			const obj = { binary: buffer }
+			expect(extractKey(obj, 'binary')).toBe(buffer)
+		})
+
+		it('extracts Uint8Array keys', () => {
+			const arr = new Uint8Array([1, 2, 3])
+			const obj = { binary: arr }
+			expect(extractKey(obj, 'binary')).toBe(arr)
+		})
+
+		it('extracts compound keys with binary values', () => {
+			const buffer = new Uint8Array([1, 2, 3]).buffer
+			const obj = { id: 'user1', signature: buffer }
+			expect(extractKey(obj, ['id', 'signature'])).toEqual(['user1', buffer])
+		})
 	})
 })
 
