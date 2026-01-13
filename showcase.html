@@ -4,11 +4,1121 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>IndexedDB Showcase</title>
-  <script type="module" crossorigin>(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))n(s);new MutationObserver(s=>{for(const o of s)if(o.type==="childList")for(const i of o.addedNodes)i.tagName==="LINK"&&i.rel==="modulepreload"&&n(i)}).observe(document,{childList:!0,subtree:!0});function e(s){const o={};return s.integrity&&(o.integrity=s.integrity),s.referrerPolicy&&(o.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?o.credentials="include":s.crossOrigin==="anonymous"?o.credentials="omit":o.credentials="same-origin",o}function n(s){if(s.ep)return;s.ep=!0;const o=e(s);fetch(s.href,o)}})();class v extends Error{code;cause;constructor(t,e,n){super(e),this.name="DatabaseError",this.code=t,this.cause=n,Object.setPrototypeOf(this,new.target.prototype)}}class q extends v{storeName;key;constructor(t,e){const n=Y(e);super("NOT_FOUND",`Record not found in "${t}" with key: ${n}`),this.name="NotFoundError",this.storeName=t,this.key=e}}class ut extends v{storeName;key;constructor(t,e,n){const s=Y(e);super("CONSTRAINT_ERROR",`Key already exists in "${t}": ${s}`,n),this.name="ConstraintError",this.storeName=t,this.key=e}}class ht extends v{constructor(t){super("QUOTA_EXCEEDED","Storage quota exceeded",t),this.name="QuotaExceededError"}}class D extends v{constructor(t,e,n){super(t,e,n),this.name="TransactionError"}}class Q extends v{constructor(t,e,n){super(t,e,n),this.name="UpgradeError"}}class mt extends v{constructor(t,e){super("OPEN_FAILED",t,e),this.name="OpenError"}}class pt extends v{constructor(t,e){super("DATA_ERROR",t,e),this.name="DataError"}}class ft extends v{constructor(t,e){super("READ_ONLY",t,e),this.name="ReadOnlyError"}}class yt extends v{constructor(t,e){super("VERSION_ERROR",t,e),this.name="VersionError"}}class V extends v{constructor(t,e){super("INVALID_STATE",t,e),this.name="InvalidStateError"}}class wt extends v{constructor(t,e){super("TIMEOUT",t,e),this.name="TimeoutError"}}function g(r,t){if(!r)return new v("UNKNOWN_ERROR","Unknown error occurred");const e=t?.storeName??"",n=t?.key??"";switch(r.name){case"ConstraintError":return new ut(e,n,r);case"QuotaExceededError":return new ht(r);case"TransactionInactiveError":return new D("TRANSACTION_INACTIVE",r.message||"Transaction is not active",r);case"AbortError":return new D("TRANSACTION_ABORTED",r.message||"Transaction was aborted",r);case"VersionError":return new yt(r.message||"Version error",r);case"DataError":return new pt(r.message||"Data error",r);case"InvalidStateError":return new V(r.message||"Invalid state",r);case"ReadOnlyError":return new ft(r.message||"Attempted write in read-only transaction",r);case"NotFoundError":return new v("NOT_FOUND",r.message||"Object store or index not found",r);case"TimeoutError":return new wt(r.message||"Operation timed out",r);default:return new v("UNKNOWN_ERROR",r.message||`Unknown error: ${r.name}`,r)}}function Y(r){return typeof r=="string"?`"${r}"`:typeof r=="number"?String(r):r instanceof Date?r.toISOString():Array.isArray(r)?`[${r.map(Y).join(", ")}]`:r instanceof ArrayBuffer||ArrayBuffer.isView(r)?"[Binary Data]":String(r)}const nt="id",st=!1,K={DATABASE_NOT_OPEN:"Database connection is not open",DATABASE_CLOSED:"Database connection has been closed",STORE_NOT_FOUND:r=>`Object store "${r}" not found`,INDEX_NOT_FOUND:r=>`Index "${r}" not found`,TRANSACTION_INACTIVE:"Transaction is no longer active",TRANSACTION_MODE_MISMATCH:"Operation requires readwrite transaction",INVALID_KEY:"Invalid key type for this operation",NATIVE_ACCESS_NO_TRANSACTION:"Native store access requires active transaction",UPGRADE_BLOCKED:"Database upgrade blocked by other connections",UPGRADE_FAILED:"Database upgrade failed",OPEN_FAILED:"Failed to open database"};function Z(r){return new Promise((t,e)=>{r.oncomplete=()=>t(),r.onerror=()=>{e(g(r.error))},r.onabort=()=>{e(new D("TRANSACTION_ABORTED",r.error?.message??"Transaction was aborted",r.error))}})}function rt(r){if(r==null)return!1;const t=typeof r;return t==="number"?!Number.isNaN(r):t==="string"?!0:r instanceof Date?!Number.isNaN(r.getTime()):r instanceof ArrayBuffer||ArrayBuffer.isView(r)?!0:Array.isArray(r)?r.every(rt):!1}function tt(r){return Array.isArray(r)?r:[r]}function gt(r){return typeof r=="number"&&Number.isInteger(r)&&r>0}function bt(r){if(!gt(r))throw new Error(`Database version must be a positive integer, got: ${String(r)}`)}function xt(r){if(r.length===0)throw new Error("Database name must be a non-empty string")}function N(r){return r===void 0?"next":r==="previous"?"prev":r==="previousunique"?"prevunique":r}function ot(r){return r==="prev"?"previous":r==="prevunique"?"previousunique":r}class O{#e;#t;constructor(t,e){this.#e=t,this.#t=e}get native(){return this.#e}getKey(){return this.#e.key}getPrimaryKey(){return this.#e.primaryKey}getValue(){return this.#e.value}getDirection(){return ot(this.#e.direction)}async continue(t){return new Promise((e,n)=>{this.#t.onsuccess=()=>{const s=this.#t.result;e(s?new O(s,this.#t):null)},this.#t.onerror=()=>n(g(this.#t.error)),t!==void 0?this.#e.continue(t):this.#e.continue()})}async continuePrimaryKey(t,e){return new Promise((n,s)=>{this.#t.onsuccess=()=>{const o=this.#t.result;n(o?new O(o,this.#t):null)},this.#t.onerror=()=>s(g(this.#t.error)),this.#e.continuePrimaryKey(t,e)})}async advance(t){return new Promise((e,n)=>{this.#t.onsuccess=()=>{const s=this.#t.result;e(s?new O(s,this.#t):null)},this.#t.onerror=()=>n(g(this.#t.error)),this.#e.advance(t)})}async update(t){return new Promise((e,n)=>{const s=this.#e.update(t);s.onsuccess=()=>e(s.result),s.onerror=()=>n(g(s.error))})}async delete(){return new Promise((t,e)=>{const n=this.#e.delete();n.onsuccess=()=>t(),n.onerror=()=>e(g(n.error))})}}class I{#e;#t;constructor(t,e){this.#e=t,this.#t=e}get native(){return this.#e}getKey(){return this.#e.key}getPrimaryKey(){return this.#e.primaryKey}getDirection(){return ot(this.#e.direction)}async continue(t){return new Promise((e,n)=>{this.#t.onsuccess=()=>{const s=this.#t.result;e(s?new I(s,this.#t):null)},this.#t.onerror=()=>n(g(this.#t.error)),t!==void 0?this.#e.continue(t):this.#e.continue()})}async continuePrimaryKey(t,e){return new Promise((n,s)=>{this.#t.onsuccess=()=>{const o=this.#t.result;n(o?new I(o,this.#t):null)},this.#t.onerror=()=>s(g(this.#t.error)),this.#e.continuePrimaryKey(t,e)})}async advance(t){return new Promise((e,n)=>{this.#t.onsuccess=()=>{const s=this.#t.result;e(s?new I(s,this.#t):null)},this.#t.onerror=()=>n(g(this.#t.error)),this.#e.advance(t)})}}function vt(){return{keyPath:null,range:null,anyOfValues:null,filters:[],direction:"ascending",limitCount:null,offsetCount:0}}class w{#e;#t;constructor(t,e){this.#e=t,this.#t=e??vt()}where(t){return new Ct(this.#e,{...this.#t,keyPath:t})}filter(t){return new w(this.#e,{...this.#t,filters:[...this.#t.filters,t]})}orderBy(t){return new w(this.#e,{...this.#t,direction:t})}limit(t){return new w(this.#e,{...this.#t,limitCount:t})}offset(t){return new w(this.#e,{...this.#t,offsetCount:t})}async toArray(){const t=[];for await(const e of this.iterate())t.push(e);return t}async first(){const e=await new w(this.#e,{...this.#t,limitCount:1}).iterate().next();return e.done?void 0:e.value}async count(){if(this.#t.filters.length===0&&this.#t.anyOfValues===null){const s=(await this.#e.ensureOpen()).transaction([this.#e.storeName],"readonly").objectStore(this.#e.storeName),i=this.#n(s).count(this.#t.range??void 0);return this.#i(i)}let t=0;for await(const e of this.iterate())t++;return t}async keys(){const t=[],s=(await this.#e.ensureOpen()).transaction([this.#e.storeName],"readonly").objectStore(this.#e.storeName),o=this.#n(s),i=N(this.#t.direction==="ascending"?"next":"previous");if(this.#t.anyOfValues!==null){const m=await this.#a(s);return this.#l(m)}const c=o.openKeyCursor(this.#t.range??void 0,i);let l=0,d=0,u=await this.#i(c);for(;u;){if(l<this.#t.offsetCount){l++,u.continue(),u=await this.#i(c);continue}if(this.#t.limitCount!==null&&d>=this.#t.limitCount)break;if(this.#t.filters.length>0){const m=s.get(u.primaryKey),h=await this.#i(m);h!==void 0&&this.#r(h)&&(t.push(u.primaryKey),d++)}else t.push(u.primaryKey),d++;u.continue(),u=await this.#i(c)}return t}async*iterate(){const n=(await this.#e.ensureOpen()).transaction([this.#e.storeName],"readonly").objectStore(this.#e.storeName);if(this.#t.anyOfValues!==null){const u=await this.#s(n),m=this.#l(u);for(const h of m)yield h;return}const s=this.#n(n),o=N(this.#t.direction==="ascending"?"next":"previous"),i=s.openCursor(this.#t.range??void 0,o);let c=0,l=0,d=await this.#i(i);for(;d;){const u=d.value;if(!this.#r(u)){d.continue(),d=await this.#i(i);continue}if(c<this.#t.offsetCount){c++,d.continue(),d=await this.#i(i);continue}if(this.#t.limitCount!==null&&l>=this.#t.limitCount)break;yield u,l++,d.continue(),d=await this.#i(i)}}#n(t){const e=this.#t.keyPath;if(e===null||e===this.#e.primaryKeyPath)return t;if(this.#e.indexNames.includes(e))return t.index(e);for(const n of this.#e.indexNames)try{const s=t.index(n);if(s.keyPath===e)return s}catch{}return t}#r(t){for(const e of this.#t.filters)if(!e(t))return!1;return!0}async#s(t){if(this.#t.anyOfValues===null)return[];const e=this.#t.keyPath,n=new Map,s=this.#t.anyOfValues.map(async i=>{let c=[];if(e===null||e===this.#e.primaryKeyPath){const l=await this.#i(t.get(i));c=l?[l]:[]}else if(this.#e.indexNames.includes(e)){const l=t.index(e);c=await this.#i(l.getAll(i))}else for(const l of this.#e.indexNames)try{const d=t.index(l);if(d.keyPath===e){c=await this.#i(d.getAll(i));break}}catch{}for(const l of c)if(this.#r(l)){const d=this.#o(l);d!==void 0&&n.set(this.#c(d),l)}});await Promise.all(s);const o=Array.from(n.values());return this.#t.direction==="descending"&&o.reverse(),o}async#a(t){if(this.#t.anyOfValues===null)return[];const e=this.#t.keyPath,n=new Set,s=[],o=this.#t.anyOfValues.map(async i=>{let c;if(e===null||e===this.#e.primaryKeyPath)c=await this.#i(t.count(i))>0?[i]:[];else if(this.#e.indexNames.includes(e)){const l=t.index(e);c=await this.#i(l.getAllKeys(i))}else c=[];for(const l of c){const d=this.#c(l);n.has(d)||(n.add(d),s.push(l))}});return await Promise.all(o),this.#t.direction==="descending"&&s.reverse(),s}#o(t){const e=this.#e.primaryKeyPath;if(!(e===null||typeof t!="object"||t===null))return t[e]}#l(t){let e=t;return this.#t.offsetCount>0&&(e=e.slice(this.#t.offsetCount)),this.#t.limitCount!==null&&(e=e.slice(0,this.#t.limitCount)),e}#i(t){return new Promise((e,n)=>{t.onsuccess=()=>e(t.result),t.onerror=()=>n(g(t.error,{storeName:this.#e.storeName}))})}#c(t){return typeof t=="string"?t:typeof t=="number"?`n:${t}`:t instanceof Date?`d:${t.getTime()}`:t instanceof ArrayBuffer?`b:${Array.from(new Uint8Array(t)).join(",")}`:ArrayBuffer.isView(t)?`b:${Array.from(new Uint8Array(t.buffer)).join(",")}`:Array.isArray(t)?`a:${JSON.stringify(t)}`:JSON.stringify(t)}}class Ct{#e;#t;constructor(t,e){this.#e=t,this.#t=e}equals(t){return rt(t)?new w(this.#e,{...this.#t,range:IDBKeyRange.only(t)}):this.#n(t,e=>e===t)}#n(t,e){const n=this.#t.keyPath,s=o=>{if(n===null||typeof o!="object"||o===null)return!1;const i=o[n];return e(i)};return new w(this.#e,{...this.#t,keyPath:null,filters:[...this.#t.filters,s]})}greaterThan(t){return new w(this.#e,{...this.#t,range:IDBKeyRange.lowerBound(t,!0)})}greaterThanOrEqual(t){return new w(this.#e,{...this.#t,range:IDBKeyRange.lowerBound(t,!1)})}lessThan(t){return new w(this.#e,{...this.#t,range:IDBKeyRange.upperBound(t,!0)})}lessThanOrEqual(t){return new w(this.#e,{...this.#t,range:IDBKeyRange.upperBound(t,!1)})}between(t,e,n){return new w(this.#e,{...this.#t,range:IDBKeyRange.bound(t,e,n?.lowerOpen??!1,n?.upperOpen??!1)})}startsWith(t){return new w(this.#e,{...this.#t,range:IDBKeyRange.bound(t,t+"￿",!1,!1)})}anyOf(t){return new w(this.#e,{...this.#t,anyOfValues:t})}}class it{#e;#t;#n;#r;constructor(t,e,n,s){this.#e=t,this.#t=e,this.#n=n,this.#r=s}get native(){throw new Error("Index.native requires active transaction. Use openCursor() or iterate().")}getName(){return this.#t}getKeyPath(){return this.#n.keyPath}isUnique(){return this.#n.unique??!1}isMultiEntry(){return this.#n.multiEntry??!1}async get(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t);return Array.isArray(t)?await Promise.all(t.map(i=>this.#s(o.get(i)))):this.#s(o.get(t))}async resolve(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t);if(Array.isArray(t))return await Promise.all(t.map(async c=>{const l=await this.#s(o.get(c));if(l===void 0)throw new q(this.#e,c);return l}));const i=await this.#s(o.get(t));if(i===void 0)throw new q(this.#e,t);return i}async getKey(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t);return this.#s(o.getKey(t))}async all(t,e){const i=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t);return this.#s(i.getAll(t??void 0,e))}async keys(t,e){const i=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t);return this.#s(i.getAllKeys(t??void 0,e))}async count(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t);return this.#s(o.count(t))}query(){return new w({storeName:this.#e,primaryKeyPath:null,indexNames:[this.#t],ensureOpen:this.#r})}async*iterate(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t),i=N(t?.direction),c=o.openCursor(t?.query??null,i);let l=await this.#s(c);for(;l;){yield l.value;const d=new Promise(u=>{c.onsuccess=()=>u(c.result)});l.continue(),l=await d}}async*iterateKeys(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t),i=N(t?.direction),c=o.openKeyCursor(t?.query??null,i);let l=await this.#s(c);for(;l;){yield l.key;const d=new Promise(u=>{c.onsuccess=()=>u(c.result)});l.continue(),l=await d}}async openCursor(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t),i=N(t?.direction),c=o.openCursor(t?.query??null,i),l=await this.#s(c);return l?new O(l,c):null}async openKeyCursor(t){const o=(await this.#r()).transaction([this.#e],"readonly").objectStore(this.#e).index(this.#t),i=N(t?.direction),c=o.openKeyCursor(t?.query??null,i),l=await this.#s(c);return l?new I(l,c):null}#s(t){return new Promise((e,n)=>{t.onsuccess=()=>e(t.result),t.onerror=()=>n(g(t.error,{storeName:this.#e}))})}}class Nt{#e;#t;#n;#r=new Set;constructor(t,e,n){this.#e=t,this.#t=e,this.#n=n}get native(){throw new Error(K.NATIVE_ACCESS_NO_TRANSACTION)}getName(){return this.#t}getKeyPath(){return this.#n.keyPath===void 0?nt:this.#n.keyPath}getIndexNames(){return(this.#n.indexes??[]).map(t=>t.name)}hasAutoIncrement(){return this.#n.autoIncrement??st}async get(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t);return Array.isArray(t)?await Promise.all(t.map(o=>this.#s(s.get(o)))):this.#s(s.get(t))}async resolve(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t);if(Array.isArray(t))return await Promise.all(t.map(async i=>{const c=await this.#s(s.get(i));if(c===void 0)throw new q(this.#t,i);return c}));const o=await this.#s(s.get(t));if(o===void 0)throw new q(this.#t,t);return o}async has(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t);return Array.isArray(t)?await Promise.all(t.map(async i=>await this.#s(s.count(i))>0)):await this.#s(s.count(t))>0}async set(t,e){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readwrite"),o=s.objectStore(this.#t);if(Array.isArray(t)){const c=await Promise.all(t.map(l=>this.#s(o.put(l))));return await this.#a(s),this.#o("set",c),c}const i=await this.#s(o.put(t,e));return await this.#a(s),this.#o("set",[i]),i}async add(t,e){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readwrite"),o=s.objectStore(this.#t);if(Array.isArray(t)){const c=await Promise.all(t.map(l=>this.#s(o.add(l))));return await this.#a(s),this.#o("add",c),c}const i=await this.#s(o.add(t,e));return await this.#a(s),this.#o("add",[i]),i}async remove(t){const n=(await this.#e.ensureOpen()).transaction([this.#t],"readwrite"),s=n.objectStore(this.#t);if(Array.isArray(t)){await Promise.all(t.map(o=>this.#s(s.delete(o)))),await this.#a(n),this.#o("remove",t.map(o=>o));return}await this.#s(s.delete(t)),await this.#a(n),this.#o("remove",[t])}async all(t,e){const o=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t);return this.#s(o.getAll(t??void 0,e))}async keys(t,e){const o=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t);return this.#s(o.getAllKeys(t??void 0,e))}async clear(){const e=(await this.#e.ensureOpen()).transaction([this.#t],"readwrite"),n=e.objectStore(this.#t);await this.#s(n.clear()),await this.#a(e),this.#o("clear",[])}async count(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t);return this.#s(s.count(t))}index(t){const n=(this.#n.indexes??[]).find(s=>s.name===t);if(!n)throw new Error(`Index "${t}" not found on store "${this.#t}"`);return new it(this.#t,t,n,()=>this.#e.ensureOpen())}query(){const t=this.getKeyPath();return new w({storeName:this.#t,primaryKeyPath:typeof t=="string"?t:null,indexNames:this.getIndexNames(),ensureOpen:()=>this.#e.ensureOpen()})}async*iterate(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t),o=N(t?.direction),i=s.openCursor(t?.query??null,o);let c=await this.#s(i);for(;c;){yield c.value;const l=new Promise(d=>{i.onsuccess=()=>d(i.result)});c.continue(),c=await l}}async*iterateKeys(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t),o=N(t?.direction),i=s.openKeyCursor(t?.query??null,o);let c=await this.#s(i);for(;c;){yield c.key;const l=new Promise(d=>{i.onsuccess=()=>d(i.result)});c.continue(),c=await l}}async openCursor(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t),o=N(t?.direction),i=s.openCursor(t?.query??null,o),c=await this.#s(i);return c?new O(c,i):null}async openKeyCursor(t){const s=(await this.#e.ensureOpen()).transaction([this.#t],"readonly").objectStore(this.#t),o=N(t?.direction),i=s.openKeyCursor(t?.query??null,o),c=await this.#s(i);return c?new I(c,i):null}onChange(t){return this.#r.add(t),()=>this.#r.delete(t)}#s(t){return new Promise((e,n)=>{t.onsuccess=()=>e(t.result),t.onerror=()=>n(g(t.error,{storeName:this.#t}))})}#a(t){return new Promise((e,n)=>{t.oncomplete=()=>e(),t.onerror=()=>n(g(t.error)),t.onabort=()=>n(g(t.error))})}#o(t,e){const n={storeName:this.#t,type:t,keys:e,source:"local"};for(const s of this.#r)try{s(n)}catch{}this.#e.emitChange(n)}emitRemoteChange(t){for(const e of this.#r)try{e(t)}catch{}}}class At{#e;#t;constructor(t,e){this.#e=t,this.#t=e}get native(){return this.#e}async get(t){return Array.isArray(t)?Promise.all(t.map(e=>this.#n(this.#e.get(e)))):this.#n(this.#e.get(t))}async resolve(t){if(Array.isArray(t))return Promise.all(t.map(async n=>{const s=await this.#n(this.#e.get(n));if(s===void 0)throw new q(this.#t,n);return s}));const e=await this.#n(this.#e.get(t));if(e===void 0)throw new q(this.#t,t);return e}async set(t,e){return Array.isArray(t)?Promise.all(t.map(n=>this.#n(this.#e.put(n)))):this.#n(this.#e.put(t,e))}async add(t,e){return Array.isArray(t)?Promise.all(t.map(n=>this.#n(this.#e.add(n)))):this.#n(this.#e.add(t,e))}async remove(t){if(Array.isArray(t)){await Promise.all(t.map(e=>this.#n(this.#e.delete(e))));return}await this.#n(this.#e.delete(t))}async all(t,e){return this.#n(this.#e.getAll(t??void 0,e))}async keys(t,e){return this.#n(this.#e.getAllKeys(t??void 0,e))}async clear(){await this.#n(this.#e.clear())}async count(t){return this.#n(this.#e.count(t))}index(t){if(!this.#e.indexNames.contains(t))throw new Error(`Index "${t}" not found on store "${this.#t}"`);const e=this.#e.index(t),n={name:e.name,keyPath:e.keyPath,unique:e.unique,multiEntry:e.multiEntry},s=this.#e.transaction.db;return new it(this.#t,t,n,()=>Promise.resolve(s))}async openCursor(t){const e=N(t?.direction),n=this.#e.openCursor(t?.query??null,e),s=await this.#n(n);return s?new O(s,n):null}async openKeyCursor(t){const e=N(t?.direction),n=this.#e.openKeyCursor(t?.query??null,e),s=await this.#n(n);return s?new I(s,n):null}#n(t){return new Promise((e,n)=>{t.onsuccess=()=>e(t.result),t.onerror=()=>n(g(t.error,{storeName:this.#t}))})}}class et{#e;#t;#n=!0;#r=!1;constructor(t){this.#e=t,this.#t=Array.from(t.objectStoreNames),t.oncomplete=()=>{this.#n=!1,this.#r=!0},t.onabort=()=>{this.#n=!1,this.#r=!0},t.onerror=()=>{this.#n=!1,this.#r=!0}}get native(){return this.#e}getMode(){return this.#e.mode}getStoreNames(){return this.#t}isActive(){return this.#n}isFinished(){return this.#r}store(t){if(!this.#t.includes(t))throw new D("INVALID_STATE",`Store "${t}" is not in transaction scope. Scoped stores: ${this.#t.join(", ")}`);if(!this.#n)throw new D("TRANSACTION_INACTIVE","Transaction is no longer active");const e=this.#e.objectStore(t);return new At(e,t)}abort(){if(this.#r)throw new D("INVALID_STATE","Cannot abort: transaction already finished");this.#e.abort(),this.#n=!1,this.#r=!0}commit(){if(this.#r)throw new D("INVALID_STATE","Cannot commit: transaction already finished");typeof this.#e.commit=="function"&&this.#e.commit()}}class Et{#e;#t;#n;#r;#s;#a;#o=null;#l=null;#i=!1;#c=null;#d=new Set;#h=new Set;#m=new Set;#u=new Set;#p=new Map;constructor(t){xt(t.name),bt(t.version),this.#e=t.name,this.#t=t.version,this.#n=t.stores,this.#r=t.migrations??[],this.#s=t.onBlocked,this.#a=t.crossTabSync!==!1,this.#a&&typeof BroadcastChannel<"u"&&(this.#c=new BroadcastChannel(`idb:${t.name}`),this.#c.onmessage=e=>{this.#y(e.data)}),this.#e=t.name,this.#t=t.version,this.#n=t.stores,this.#r=t.migrations??[],this.#s=t.onBlocked,t.onChange&&this.#d.add(t.onChange),t.onError&&this.#h.add(t.onError),t.onVersionChange&&this.#m.add(t.onVersionChange),t.onClose&&this.#u.add(t.onClose)}get native(){if(!this.#o)throw new V(K.DATABASE_NOT_OPEN);return this.#o}getName(){return this.#e}getVersion(){return this.#t}getStoreNames(){return this.#o?Array.from(this.#o.objectStoreNames):Object.keys(this.#n)}isOpen(){return this.#o!==null&&!this.#i}store(t){if(!(t in this.#n))throw new V(K.STORE_NOT_FOUND(t));let e=this.#p.get(t);return e||(e=new Nt(this,t,this.#n[t]),this.#p.set(t,e)),e}async read(t,e){const n=await this.ensureOpen(),s=tt(t),o=n.transaction([...s],"readonly"),i=new et(o);try{await e(i),await Z(o)}catch(c){if(i.isActive())try{i.abort()}catch{}throw c}}async write(t,e,n){const s=await this.ensureOpen(),o=tt(t),i=n?.durability?{durability:n.durability}:void 0,c=[...o],l=i?s.transaction(c,"readwrite",i):s.transaction(c,"readwrite"),d=new et(l);try{await e(d),await Z(l)}catch(u){if(d.isActive())try{d.abort()}catch{}throw u}}close(){this.#c&&(this.#c.close(),this.#c=null),this.#o&&(this.#o.close(),this.#o=null),this.#i=!0,this.#l=null;for(const t of this.#u)try{t()}catch{}}async drop(){return this.close(),new Promise((t,e)=>{const n=indexedDB.deleteDatabase(this.#e);n.onsuccess=()=>t(),n.onerror=()=>e(g(n.error)),n.onblocked=()=>{}})}onChange(t){return this.#d.add(t),()=>this.#d.delete(t)}onError(t){return this.#h.add(t),()=>this.#h.delete(t)}onVersionChange(t){return this.#m.add(t),()=>this.#m.delete(t)}onClose(t){return this.#u.add(t),()=>this.#u.delete(t)}async ensureOpen(){if(this.#i)throw new V(K.DATABASE_CLOSED);if(this.#o)return this.#o;if(this.#l)return this.#l;this.#l=this.#w();try{return this.#o=await this.#l,this.#o}catch(t){throw this.#l=null,t}}emitChange(t){for(const e of this.#d)try{e(t)}catch(n){this.#f(n instanceof Error?n:new Error(String(n)))}if(t.source==="local"&&this.#c)try{this.#c.postMessage(t)}catch{}}#y(t){const e={...t,source:"remote"};for(const s of this.#d)try{s(e)}catch(o){this.#f(o instanceof Error?o:new Error(String(o)))}const n=this.#p.get(t.storeName);n&&n.emitRemoteChange(e)}async#w(){return new Promise((t,e)=>{const n=indexedDB.open(this.#e,this.#t);n.onerror=()=>{e(new mt(`Failed to open database "${this.#e}"`,n.error))},n.onsuccess=()=>{const s=n.result;this.#g(s),t(s)},n.onupgradeneeded=s=>{const o=n.result,i=n.transaction;if(!i){e(new Q("UPGRADE_FAILED","No transaction available during upgrade"));return}try{this.#b(o,i,s.oldVersion,s.newVersion??this.#t)}catch(c){i.abort(),e(c instanceof Q?c:new Q("UPGRADE_FAILED",c instanceof Error?c.message:"Upgrade failed",c))}},n.onblocked=s=>{this.#s&&this.#s({oldVersion:s.oldVersion,newVersion:s.newVersion??this.#t})}})}#g(t){t.onversionchange=e=>{for(const n of this.#m)try{n({oldVersion:e.oldVersion,newVersion:e.newVersion})}catch{}},t.onclose=()=>{this.#o=null,this.#i=!0;for(const e of this.#u)try{e()}catch{}},t.onerror=e=>{const s=e.target?.error??new Error("Unknown database error");this.#f(s instanceof Error?s:new Error(String(s)))}}#b(t,e,n,s){for(const[i,c]of Object.entries(this.#n))t.objectStoreNames.contains(i)||this.#x(t,i,c);const o=this.#r.filter(i=>i.version>n&&i.version<=s).sort((i,c)=>i.version-c.version);for(const i of o)i.migrate({database:t,transaction:e,oldVersion:n,newVersion:s})}#x(t,e,n){const s=n.keyPath===void 0?nt:n.keyPath,i={autoIncrement:n.autoIncrement??st};s!==null&&(i.keyPath=s);const c=t.createObjectStore(e,i);for(const l of n.indexes??[])this.#v(c,l)}#v(t,e){t.createIndex(e.name,e.keyPath,{unique:e.unique??!1,multiEntry:e.multiEntry??!1})}#f(t){for(const e of this.#h)try{e(t)}catch{}}}function St(r){return new Et(r)}const Tt=[{id:"t1",title:"Learn IndexedDB basics",completed:!0,priority:"high",createdAt:Date.now()-864e5*3},{id:"t2",title:"Build a todo app",completed:!0,priority:"high",createdAt:Date.now()-864e5*2},{id:"t3",title:"Implement cross-tab sync",completed:!1,priority:"medium",createdAt:Date.now()-864e5},{id:"t4",title:"Write documentation",completed:!1,priority:"medium",createdAt:Date.now()-36e5},{id:"t5",title:"Add more examples",completed:!1,priority:"low",createdAt:Date.now()}],Pt=[{id:"n1",title:"Meeting Notes",content:"Discuss Q4 goals and roadmap",color:"#fff3cd",updatedAt:Date.now()-864e5},{id:"n2",title:"Shopping List",content:"Milk, Bread, Eggs, Coffee",color:"#d1ecf1",updatedAt:Date.now()-36e5},{id:"n3",title:"Ideas",content:"New project concepts for 2026",color:"#d4edda",updatedAt:Date.now()-18e5},{id:"n4",title:"Reminders",content:"Call dentist, Pay bills",color:"#f8d7da",updatedAt:Date.now()}],f=St({name:"showcase-app",version:1,stores:{todos:{indexes:[{name:"byCompleted",keyPath:"completed"},{name:"byPriority",keyPath:"priority"},{name:"byCreatedAt",keyPath:"createdAt"}]},notes:{indexes:[{name:"byColor",keyPath:"color"},{name:"byUpdatedAt",keyPath:"updatedAt"}]}},crossTabSync:!0});let U="todos";const R=[];let L=null,$=null,_=null,W=null,M=null;function H(){return Math.random().toString(36).slice(2,11)}function a(r,t){const e=document.createElement(r);return t?.className&&(e.className=t.className),t?.textContent&&(e.textContent=t.textContent),t?.id&&(e.id=t.id),t?.type&&"type"in e&&(e.type=t.type),t?.placeholder&&"placeholder"in e&&(e.placeholder=t.placeholder),t?.value&&"value"in e&&(e.value=t.value),t?.min&&"min"in e&&(e.min=t.min),t?.max&&"max"in e&&(e.max=t.max),t?.dataset&&Object.entries(t.dataset).forEach(([n,s])=>{e.dataset[n]=s}),e}function x(r,t,e=!1){const n=a("option",{value:r,textContent:t});return n.selected=e,n}function J(r){return new Date(r).toLocaleString()}function at(r){switch(r){case"high":return"🔴";case"medium":return"🟡";case"low":return"🟢";default:return"⚪"}}function Lt(){f.onChange(r=>{R.unshift(r),R.length>100&&R.pop(),X()})}function X(){if(!M)return;const{logContent:r}=M;if(r.innerHTML="",R.length===0){const e=a("p",{className:"placeholder",textContent:"No events yet. Make some changes!"});r.appendChild(e);return}const t=a("ul",{className:"event-list"});R.slice(0,20).forEach(e=>{const n=new Date().toLocaleTimeString(),s=e.source==="remote"?"remote":"local",o=a("li",{className:s}),i=a("span",{className:"event-time",textContent:n}),c=a("span",{className:"event-source",textContent:e.source.toUpperCase()}),l=a("span",{className:"event-type",textContent:e.type}),d=a("span",{className:"event-store",textContent:e.storeName}),u=e.keys.slice(0,3).map(h=>typeof h=="string"?h:typeof h=="number"?String(h):h instanceof Date?h.toISOString():JSON.stringify(h)).join(", "),m=a("span",{className:"event-keys",textContent:`[${u}${e.keys.length>3?"...":""}]`});o.append(i,c,l,d,m),t.appendChild(o)}),r.appendChild(t)}function Dt(){const r=a("div",{className:"container"}),t=a("header"),e=a("h1",{textContent:"🗄️ IndexedDB Showcase"}),n=a("p",{textContent:"Interactive demo of @mikesaintsg/indexeddb features"});t.append(e,n);const s=a("nav",{className:"tabs"}),o=a("main",{id:"content"}),i=a("footer"),c=a("p",{textContent:"💡 Open this page in another tab to see cross-tab sync in action!"});return i.appendChild(c),r.append(t,s,o,i),{container:r,header:t,nav:s,content:o,footer:i}}function Ot(r){const{nav:t}=r;[{id:"todos",emoji:"📋",label:"Todos"},{id:"notes",emoji:"📝",label:"Notes"},{id:"query",emoji:"🔍",label:"Query Builder"},{id:"events",emoji:"📡",label:"Live Events"}].forEach(({id:n,emoji:s,label:o})=>{const i=a("button",{className:`tab ${U===n?"active":""}`,textContent:`${s} ${o}`});i.dataset.tab=n,i.addEventListener("click",()=>{U=n,ct()}),t.appendChild(i)})}function ct(){const r=document.getElementById("app");r&&(L?L.nav.querySelectorAll(".tab").forEach(e=>{const n=e;n.classList.toggle("active",n.dataset.tab===U)}):(r.innerHTML="",L=Dt(),Ot(L),r.appendChild(L.container)),It())}function It(){if(!L)return;const{content:r}=L;switch(r.innerHTML="",U){case"todos":Bt(r);break;case"notes":Rt(r);break;case"query":qt(r);break;case"events":kt(r);break}}function Bt(r){const t=a("section",{className:"card"}),e=a("h2",{textContent:"Todo List — CRUD Operations"}),n=a("p",{className:"subtitle"});n.innerHTML="Demonstrates: <code>add()</code>, <code>set()</code>, <code>get()</code>, <code>remove()</code>, <code>all()</code>";const s=a("div",{className:"form-row"}),o=a("input",{type:"text",id:"todo-title",placeholder:"What needs to be done?"}),i=a("select",{id:"todo-priority"});i.append(x("low","🟢 Low"),x("medium","🟡 Medium",!0),x("high","🔴 High"));const c=a("button",{id:"add-todo",className:"btn primary",textContent:"Add Todo"});s.append(o,i,c);const l=a("div",{className:"action-row"}),d=a("button",{id:"load-samples",className:"btn secondary",textContent:"Load Sample Todos"}),u=a("button",{id:"clear-completed",className:"btn warning",textContent:"Clear Completed"}),m=a("button",{id:"clear-todos",className:"btn danger",textContent:"Clear All"});l.append(d,u,m);const h=a("div",{className:"filter-row"}),p=a("button",{className:"filter-btn active",textContent:"All"});p.dataset.filter="all";const y=a("button",{className:"filter-btn",textContent:"Active"});y.dataset.filter="active";const A=a("button",{className:"filter-btn",textContent:"Completed"});A.dataset.filter="completed",h.append(p,y,A);const b=a("div",{id:"todo-list",className:"todo-list"}),B=a("div",{className:"loading",textContent:"Loading..."});b.appendChild(B);const S=a("div",{className:"stats",id:"todo-stats"});t.append(e,n,s,l,h,b,S),r.appendChild(t),$={titleInput:o,prioritySelect:i,addButton:c,loadSamplesButton:d,clearCompletedButton:u,clearAllButton:m,filterAllButton:p,filterActiveButton:y,filterCompletedButton:A,listContainer:b,stats:S},_t(),E()}function Rt(r){const t=a("section",{className:"card"}),e=a("h2",{textContent:"Sticky Notes — Batch Operations & Transactions"}),n=a("p",{className:"subtitle"});n.innerHTML="Demonstrates: <code>set([...])</code> batching, <code>db.write()</code> transactions";const s=a("div",{className:"form-row"}),o=a("input",{type:"text",id:"note-title",placeholder:"Note title"}),i=a("input",{type:"text",id:"note-content",placeholder:"Note content"}),c=a("select",{id:"note-color"});c.append(x("#fff3cd","🟡 Yellow"),x("#d1ecf1","🔵 Blue"),x("#d4edda","🟢 Green"),x("#f8d7da","🔴 Pink"));const l=a("button",{id:"add-note",className:"btn primary",textContent:"Add Note"});s.append(o,i,c,l);const d=a("div",{className:"action-row"}),u=a("button",{id:"load-sample-notes",className:"btn secondary",textContent:"Load Sample Notes (Batch)"}),m=a("button",{id:"clear-notes",className:"btn danger",textContent:"Clear All (Transaction)"});d.append(u,m);const h=a("div",{id:"notes-grid",className:"notes-grid"}),p=a("div",{className:"loading",textContent:"Loading..."});h.appendChild(p),t.append(e,n,s,d,h),r.appendChild(t),_={titleInput:o,contentInput:i,colorSelect:c,addButton:l,loadSamplesButton:u,clearAllButton:m,grid:h},Mt(),j()}function qt(r){const t=a("section",{className:"card"}),e=a("h2",{textContent:"Query Builder — Advanced Queries"}),n=a("p",{className:"subtitle"});n.innerHTML="Demonstrates: <code>query()</code>, <code>where()</code>, <code>filter()</code>, <code>limit()</code>, <code>offset()</code>";const s=a("div",{className:"query-builder"}),o=a("div",{className:"query-row"}),i=a("label",{textContent:"Filter by Priority:"}),c=a("select",{id:"query-priority"});c.append(x("","All Priorities"),x("high","🔴 High Only"),x("medium","🟡 Medium Only"),x("low","🟢 Low Only")),o.append(i,c);const l=a("div",{className:"query-row"}),d=a("label",{textContent:"Status:"}),u=a("select",{id:"query-status"});u.append(x("","All Status"),x("active","Active Only"),x("completed","Completed Only")),l.append(d,u);const m=a("div",{className:"query-row"}),h=a("label",{textContent:"Pagination:"}),p=a("input",{type:"number",id:"query-limit",value:"3",min:"1",max:"20"}),y=a("span",{textContent:"items per page"}),A=a("button",{id:"prev-page",className:"btn small",textContent:"← Prev"}),b=a("span",{id:"page-info",textContent:"Page 1"}),B=a("button",{id:"next-page",className:"btn small",textContent:"Next →"});m.append(h,p,y,A,b,B);const S=a("button",{id:"run-query",className:"btn primary",textContent:"Run Query"});s.append(o,l,m,S);const k=a("div",{id:"query-results",className:"query-results"}),C=a("p",{className:"placeholder",textContent:'Click "Run Query" to see results'});k.appendChild(C);const T=a("div",{className:"code-section"}),lt=a("h3",{textContent:"Generated Code"}),F=a("div",{id:"query-code",className:"code-block"}),z=a("pre"),dt=a("code",{textContent:"// Query code will appear here"});z.appendChild(dt),F.appendChild(z),T.append(lt,F),t.append(e,n,s,k,T),r.appendChild(t),W={prioritySelect:c,statusSelect:u,limitInput:p,prevButton:A,nextButton:B,pageInfo:b,runButton:S,results:k,codeBlock:F},Kt()}function kt(r){const t=a("section",{className:"card"}),e=a("h2",{textContent:"Live Events — Cross-Tab Synchronization"}),n=a("p",{className:"subtitle"});n.innerHTML="Demonstrates: <code>onChange()</code>, <code>BroadcastChannel</code> sync";const s=a("div",{className:"info-box"}),o=a("p");o.innerHTML="📡 <strong>Open this page in another browser tab</strong> and make changes. You'll see events appear here in real-time!";const i=a("p");i.innerHTML="🔵 <strong>LOCAL</strong> events are from this tab. 🟠 <strong>REMOTE</strong> events are from other tabs.",s.append(o,i);const c=a("div",{className:"action-row"}),l=a("button",{id:"trigger-add",className:"btn secondary",textContent:"Trigger Add Event"}),d=a("button",{id:"trigger-set",className:"btn secondary",textContent:"Trigger Set Event"}),u=a("button",{id:"trigger-remove",className:"btn secondary",textContent:"Trigger Remove Event"}),m=a("button",{id:"clear-log",className:"btn danger",textContent:"Clear Log"});c.append(l,d,u,m);const h=a("div",{id:"event-log-content",className:"event-log"}),p=a("p",{className:"placeholder",textContent:"No events yet. Make some changes!"});h.appendChild(p),t.append(e,n,s,c,h),r.appendChild(t),M={triggerAddButton:l,triggerSetButton:d,triggerRemoveButton:u,clearLogButton:m,logContent:h},Ut(),X()}function jt(r){const t=a("div",{className:`todo-item ${r.completed?"completed":""}`,dataset:{id:r.id}}),e=a("input",{type:"checkbox"});e.className="todo-toggle",e.checked=r.completed;const n=a("span",{className:"priority",textContent:at(r.priority)}),s=a("span",{className:"todo-title",textContent:r.title}),o=a("span",{className:"todo-date",textContent:J(r.createdAt)}),i=a("button",{className:"delete-btn",textContent:"×"});return i.title="Delete",t.append(e,n,s,o,i),t}async function E(r="all"){if(!$)return;const{listContainer:t,stats:e}=$;try{const n=await f.store("todos").all();let s;r==="all"?s=n:r==="completed"?s=n.filter(u=>u.completed):s=n.filter(u=>!u.completed);const o=[...s].sort((u,m)=>m.createdAt-u.createdAt);if(t.innerHTML="",o.length===0){const u=a("p",{className:"empty",textContent:r==="all"?"No todos yet. Add one above or load samples!":`No ${r} todos.`});t.appendChild(u)}else o.forEach(u=>{t.appendChild(jt(u))});const i=n.filter(u=>u.completed).length;e.innerHTML="";const c=a("span");c.innerHTML="📊 Total: <strong>"+n.length+"</strong>";const l=a("span");l.innerHTML="✅ Completed: <strong>"+i+"</strong>";const d=a("span");d.innerHTML="⏳ Active: <strong>"+(n.length-i)+"</strong>",e.append(c,l,d)}catch(n){t.innerHTML="";const s=a("p",{className:"error",textContent:`Error loading todos: ${String(n)}`});t.appendChild(s)}}function $t(r){const t=a("div",{className:"note-card",dataset:{id:r.id}});t.style.backgroundColor=r.color;const e=a("h3",{textContent:r.title}),n=a("p",{textContent:r.content}),s=a("div",{className:"note-footer"}),o=a("span",{textContent:J(r.updatedAt)}),i=a("button",{className:"delete-note-btn",textContent:"×"});return i.title="Delete",s.append(o,i),t.append(e,n,s),t}async function j(){if(!_)return;const{grid:r}=_;try{const e=[...await f.store("notes").all()].sort((n,s)=>s.updatedAt-n.updatedAt);if(r.innerHTML="",e.length===0){const n=a("p",{className:"empty",textContent:"No notes yet. Add one above or load samples!"});r.appendChild(n)}else e.forEach(n=>{r.appendChild($t(n))})}catch(t){r.innerHTML="";const e=a("p",{className:"error",textContent:`Error loading notes: ${String(t)}`});r.appendChild(e)}}function _t(){if(!$)return;const{titleInput:r,prioritySelect:t,addButton:e,loadSamplesButton:n,clearCompletedButton:s,clearAllButton:o,filterAllButton:i,filterActiveButton:c,filterCompletedButton:l,listContainer:d}=$,u=async()=>{const h=r.value.trim();h&&(await f.store("todos").add({id:H(),title:h,completed:!1,priority:t.value,createdAt:Date.now()}),r.value="",E())};e.addEventListener("click",()=>{u()}),r.addEventListener("keypress",h=>{h.key==="Enter"&&u()}),n.addEventListener("click",()=>{(async()=>(await f.store("todos").set([...Tt]),E()))()}),s.addEventListener("click",()=>{(async()=>{const p=(await f.store("todos").all()).filter(y=>y.completed).map(y=>y.id);p.length>0&&await f.store("todos").remove(p),E()})()}),o.addEventListener("click",()=>{(async()=>(await f.store("todos").clear(),E()))()});const m=h=>{i.classList.remove("active"),c.classList.remove("active"),l.classList.remove("active"),h.classList.add("active")};i.addEventListener("click",()=>{m(i),E("all")}),c.addEventListener("click",()=>{m(c),E("active")}),l.addEventListener("click",()=>{m(l),E("completed")}),d.addEventListener("click",h=>{const p=h.target,y=p.closest(".todo-item");if(!y)return;const A=y.dataset.id;A&&(async()=>{if(p.classList.contains("todo-toggle")){const b=await f.store("todos").get(A);b&&(await f.store("todos").set({...b,completed:!b.completed}),E())}else p.classList.contains("delete-btn")&&(await f.store("todos").remove(A),E())})()})}function Mt(){if(!_)return;const{titleInput:r,contentInput:t,colorSelect:e,addButton:n,loadSamplesButton:s,clearAllButton:o,grid:i}=_,c=async()=>{const l=r.value.trim()||"Untitled",d=t.value.trim()||"";await f.store("notes").add({id:H(),title:l,content:d,color:e.value,updatedAt:Date.now()}),r.value="",t.value="",j()};n.addEventListener("click",()=>{c()}),s.addEventListener("click",()=>{(async()=>(await f.store("notes").set([...Pt]),j()))()}),o.addEventListener("click",()=>{(async()=>(await f.write("notes",async l=>{await l.store("notes").clear()}),j()))()}),i.addEventListener("click",l=>{const d=l.target;if(!d.classList.contains("delete-note-btn"))return;const u=d.closest(".note-card");if(!u)return;const m=u.dataset.id;m&&(async()=>(await f.store("notes").remove(m),j()))()})}let P=0,G=0;function Vt(r){const t=a("table"),e=a("thead"),n=a("tr");n.append(a("th",{textContent:"Title"}),a("th",{textContent:"Priority"}),a("th",{textContent:"Status"}),a("th",{textContent:"Created"})),e.appendChild(n);const s=a("tbody");return r.forEach(o=>{const i=a("tr",{className:o.completed?"completed":""}),c=a("td",{textContent:o.title}),l=a("td",{textContent:`${at(o.priority)} ${o.priority}`}),d=a("td",{textContent:o.completed?"✅ Done":"⏳ Active"}),u=a("td",{textContent:J(o.createdAt)});i.append(c,l,d,u),s.appendChild(i)}),t.append(e,s),t}function Kt(){if(!W)return;const{prioritySelect:r,statusSelect:t,limitInput:e,prevButton:n,nextButton:s,pageInfo:o,runButton:i,results:c,codeBlock:l}=W,d=async()=>{const u=r.value,m=t.value,h=parseInt(e.value,10)||3;let p=f.store("todos").query();const y=["db.store('todos').query()"];if(u&&(p=p.where("byPriority").equals(u),y.push(`  .where('byPriority').equals('${u}')`)),m){const C=m==="completed";p=p.filter(T=>T.completed===C),y.push(`  .filter(t => t.completed === ${String(C)})`)}if(G=(await p.toArray()).length,p=f.store("todos").query(),u&&(p=p.where("byPriority").equals(u)),m){const C=m==="completed";p=p.filter(T=>T.completed===C)}p=p.limit(h).offset(P*h),y.push(`  .limit(${h}).offset(${P*h})`),y.push("  .toArray()");const b=await p.toArray();if(c.innerHTML="",b.length===0&&P===0){const C=a("p",{className:"empty",textContent:"No results found. Try loading sample todos first!"});c.appendChild(C)}else if(b.length===0){const C=a("p",{className:"empty",textContent:"No more results on this page."});c.appendChild(C)}else{const C=Vt(b),T=a("p",{className:"result-count",textContent:`Showing ${b.length} of ${G} total results`});c.append(C,T)}const B=Math.ceil(G/h)||1;o.textContent=`Page ${P+1} of ${B}`;const S=a("pre"),k=a("code",{textContent:y.join(`
-`)});S.appendChild(k),l.innerHTML="",l.appendChild(S)};i.addEventListener("click",()=>{P=0,d()}),n.addEventListener("click",()=>{P>0&&(P--,d())}),s.addEventListener("click",()=>{P++,d()}),d()}function Ut(){if(!M)return;const{triggerAddButton:r,triggerSetButton:t,triggerRemoveButton:e,clearLogButton:n}=M;r.addEventListener("click",()=>{(async()=>await f.store("todos").add({id:H(),title:`Event Test ${new Date().toLocaleTimeString()}`,completed:!1,priority:"low",createdAt:Date.now()}))()}),t.addEventListener("click",()=>{(async()=>{const s=await f.store("todos").all();if(s.length>0){const o=s[0];o&&await f.store("todos").set({...o,title:`Updated ${new Date().toLocaleTimeString()}`})}else await f.store("todos").set({id:H(),title:`Set Event ${new Date().toLocaleTimeString()}`,completed:!1,priority:"medium",createdAt:Date.now()})})()}),e.addEventListener("click",()=>{(async()=>{const s=await f.store("todos").all();s.length>0&&s[0]&&await f.store("todos").remove(s[0].id)})()}),n.addEventListener("click",()=>{R.length=0,X()})}Lt();ct();</script>
-  <style rel="stylesheet" crossorigin>*{box-sizing:border-box;margin:0;padding:0}:root{--primary: #4f46e5;--primary-hover: #4338ca;--danger: #dc2626;--danger-hover: #b91c1c;--warning: #f59e0b;--warning-hover: #d97706;--secondary: #6b7280;--secondary-hover: #4b5563;--success: #10b981;--bg: #f3f4f6;--card-bg: #ffffff;--text: #1f2937;--text-muted: #6b7280;--border: #e5e7eb;--radius: 8px;--shadow: 0 1px 3px rgba(0, 0, 0, .1);--shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, .1)}body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen,Ubuntu,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}.container{max-width:900px;margin:0 auto;padding:20px}header{text-align:center;margin-bottom:24px}header h1{font-size:2rem;margin-bottom:8px;color:var(--primary)}header p{color:var(--text-muted)}footer{text-align:center;margin-top:32px;padding:16px;color:var(--text-muted);font-size:.875rem;background:#e0e7ff;border-radius:var(--radius)}.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}.tab{padding:10px 20px;border:none;background:var(--card-bg);border-radius:var(--radius);cursor:pointer;font-size:.95rem;font-weight:500;transition:all .2s;box-shadow:var(--shadow)}.tab:hover{background:var(--border)}.tab.active{background:var(--primary);color:#fff}.card{background:var(--card-bg);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-lg)}.card h2{margin-bottom:4px;font-size:1.5rem}.card .subtitle{color:var(--text-muted);margin-bottom:20px;font-size:.875rem}.card code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:.85rem;color:var(--primary)}.form-row,.action-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}input[type=text],input[type=number],select{padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:.95rem;background:#fff;flex:1;min-width:120px}input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px #4f46e51a}input[type=number]{width:80px;flex:none}.btn{padding:10px 18px;border:none;border-radius:var(--radius);font-size:.95rem;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}.btn.small{padding:6px 12px;font-size:.85rem}.btn.primary{background:var(--primary);color:#fff}.btn.primary:hover{background:var(--primary-hover)}.btn.secondary{background:var(--secondary);color:#fff}.btn.secondary:hover{background:var(--secondary-hover)}.btn.warning{background:var(--warning);color:#fff}.btn.warning:hover{background:var(--warning-hover)}.btn.danger{background:var(--danger);color:#fff}.btn.danger:hover{background:var(--danger-hover)}.filter-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}.filter-btn{padding:6px 14px;border:1px solid var(--border);background:#fff;border-radius:20px;cursor:pointer;font-size:.875rem;transition:all .2s}.filter-btn:hover{background:var(--border)}.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}.todo-list{max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)}.todo-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .2s}.todo-item:last-child{border-bottom:none}.todo-item:hover{background:#f9fafb}.todo-item.completed .todo-title{text-decoration:line-through;color:var(--text-muted)}.todo-toggle{width:20px;height:20px;cursor:pointer;flex-shrink:0}.priority{font-size:1rem;flex-shrink:0}.todo-title{flex:1;font-size:.95rem}.todo-date{font-size:.75rem;color:var(--text-muted);flex-shrink:0}.delete-btn{width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);font-size:1.2rem;cursor:pointer;border-radius:50%;transition:all .2s;flex-shrink:0}.delete-btn:hover{background:var(--danger);color:#fff}.stats{display:flex;gap:24px;padding-top:16px;border-top:1px solid var(--border);margin-top:16px;font-size:.875rem;color:var(--text-muted)}.stats strong{color:var(--text)}.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:16px}.note-card{padding:16px;border-radius:var(--radius);box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s}.note-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}.note-card h3{font-size:1rem;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.note-card p{font-size:.875rem;color:#374151;margin-bottom:12px;max-height:60px;overflow:hidden}.note-footer{display:flex;justify-content:space-between;align-items:center;font-size:.75rem;color:var(--text-muted)}.delete-note-btn{width:24px;height:24px;border:none;background:#0000001a;border-radius:50%;cursor:pointer;font-size:1rem;line-height:1}.delete-note-btn:hover{background:var(--danger);color:#fff}.query-builder{background:#f8fafc;padding:20px;border-radius:var(--radius);margin-bottom:20px}.query-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}.query-row label{width:140px;font-weight:500;font-size:.875rem;flex-shrink:0}.query-row select{flex:none;width:180px}.query-results{min-height:100px;margin-bottom:20px}.query-results table{width:100%;border-collapse:collapse}.query-results th,.query-results td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}.query-results th{background:#f8fafc;font-weight:600;font-size:.875rem}.query-results td{font-size:.875rem}.query-results tr.completed td{color:var(--text-muted)}.result-count{margin-top:12px;font-size:.875rem;color:var(--text-muted)}.code-section h3{font-size:.95rem;margin-bottom:8px;color:var(--text-muted)}.code-block{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:var(--radius);overflow-x:auto}.code-block pre{margin:0;font-family:Fira Code,Monaco,Consolas,monospace;font-size:.85rem;line-height:1.6}.info-box{background:#dbeafe;border:1px solid #93c5fd;padding:16px;border-radius:var(--radius);margin-bottom:20px}.info-box p{color:#1e40af;margin:0 0 8px}.info-box p:last-child{margin-bottom:0}.event-log{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:var(--radius);max-height:400px;overflow-y:auto;font-family:Fira Code,Monaco,Consolas,monospace;font-size:.85rem}.event-list{list-style:none}.event-list li{padding:8px 12px;border-bottom:1px solid #334155;display:flex;gap:12px;align-items:center}.event-list li:last-child{border-bottom:none}.event-list li.local{border-left:3px solid #3b82f6}.event-list li.remote{border-left:3px solid #f59e0b;background:#f59e0b1a}.event-time{color:#94a3b8;font-size:.75rem}.event-source{font-weight:600;font-size:.75rem;padding:2px 6px;border-radius:4px}.event-list li.local .event-source{background:#3b82f6;color:#fff}.event-list li.remote .event-source{background:#f59e0b;color:#fff}.event-type{color:#22c55e}.event-store{color:#a78bfa}.event-keys{color:#94a3b8;font-size:.75rem}.loading{text-align:center;padding:40px;color:var(--text-muted)}.empty,.placeholder{text-align:center;padding:40px;color:var(--text-muted);font-style:italic}.error{color:var(--danger);text-align:center;padding:20px}@media(max-width:600px){.container{padding:12px}header h1{font-size:1.5rem}.tabs{gap:4px}.tab{padding:8px 12px;font-size:.85rem}.form-row{flex-direction:column}.form-row input,.form-row select{width:100%}.action-row{flex-direction:column}.action-row .btn{width:100%}.query-row{flex-direction:column;align-items:stretch}.query-row label,.query-row select{width:100%}.stats{flex-direction:column;gap:8px}}</style>
+  <script type="module" crossorigin>(function(){const e=document.createElement("link").relList;if(e&&e.supports&&e.supports("modulepreload"))return;for(const n of document.querySelectorAll('link[rel="modulepreload"]'))s(n);new MutationObserver(n=>{for(const a of n)if(a.type==="childList")for(const o of a.addedNodes)o.tagName==="LINK"&&o.rel==="modulepreload"&&s(o)}).observe(document,{childList:!0,subtree:!0});function t(n){const a={};return n.integrity&&(a.integrity=n.integrity),n.referrerPolicy&&(a.referrerPolicy=n.referrerPolicy),n.crossOrigin==="use-credentials"?a.credentials="include":n.crossOrigin==="anonymous"?a.credentials="omit":a.credentials="same-origin",a}function s(n){if(n.ep)return;n.ep=!0;const a=t(n);fetch(n.href,a)}})();const J=[{id:"u1",name:"Alice Johnson",email:"alice@example.com",age:28,status:"active",role:"admin",tags:["developer","leader"],createdAt:Date.now()-864e5*30},{id:"u2",name:"Bob Smith",email:"bob@example.com",age:35,status:"active",role:"user",tags:["developer"],createdAt:Date.now()-864e5*20},{id:"u3",name:"Carol White",email:"carol@example.com",age:42,status:"inactive",role:"user",tags:["designer"],createdAt:Date.now()-864e5*15},{id:"u4",name:"David Brown",email:"david@example.com",age:25,status:"active",role:"guest",tags:["intern"],createdAt:Date.now()-864e5*10},{id:"u5",name:"Eva Green",email:"eva@example.com",age:31,status:"active",role:"user",tags:["developer","tester"],createdAt:Date.now()-864e5*5}],X=[{id:"p1",title:"Getting Started with IndexedDB",content:"IndexedDB is a powerful browser API...",authorId:"u1",published:!0,views:1200,createdAt:Date.now()-864e5*10},{id:"p2",title:"Advanced Queries",content:"Learn how to use the query builder...",authorId:"u1",published:!0,views:800,createdAt:Date.now()-864e5*8},{id:"p3",title:"Draft: New Features",content:"This post is still being written...",authorId:"u2",published:!1,views:50,createdAt:Date.now()-864e5*5},{id:"p4",title:"Cross-Tab Sync",content:"Keep data synchronized across tabs...",authorId:"u2",published:!0,views:500,createdAt:Date.now()-864e5*3},{id:"p5",title:"Error Handling Best Practices",content:"How to handle errors properly...",authorId:"u5",published:!0,views:300,createdAt:Date.now()-864e5}],ce=[{id:"s1",key:"theme",value:"dark",updatedAt:Date.now()-36e5},{id:"s2",key:"language",value:"en",updatedAt:Date.now()-72e5},{id:"s3",key:"notifications",value:"enabled",updatedAt:Date.now()}];class N extends Error{code;cause;constructor(e,t,s){super(t),this.name="DatabaseError",this.code=e,this.cause=s,Object.setPrototypeOf(this,new.target.prototype)}}class P extends N{storeName;key;constructor(e,t){const s=te(t);super("NOT_FOUND",`Record not found in "${e}" with key: ${s}`),this.name="NotFoundError",this.storeName=e,this.key=t}}class Y extends N{storeName;key;constructor(e,t,s){const n=te(t);super("CONSTRAINT_ERROR",`Key already exists in "${e}": ${n}`,s),this.name="ConstraintError",this.storeName=e,this.key=t}}class we extends N{constructor(e){super("QUOTA_EXCEEDED","Storage quota exceeded",e),this.name="QuotaExceededError"}}class $ extends N{constructor(e,t,s){super(e,t,s),this.name="TransactionError"}}class Q extends N{constructor(e,t,s){super(e,t,s),this.name="UpgradeError"}}class be extends N{constructor(e,t){super("OPEN_FAILED",e,t),this.name="OpenError"}}class ve extends N{constructor(e,t){super("DATA_ERROR",e,t),this.name="DataError"}}class xe extends N{constructor(e,t){super("READ_ONLY",e,t),this.name="ReadOnlyError"}}class Ee extends N{constructor(e,t){super("VERSION_ERROR",e,t),this.name="VersionError"}}class L extends N{constructor(e,t){super("INVALID_STATE",e,t),this.name="InvalidStateError"}}class Ce extends N{constructor(e,t){super("TIMEOUT",e,t),this.name="TimeoutError"}}function T(r,e){if(!r)return new N("UNKNOWN_ERROR","Unknown error occurred");const t=e?.storeName??"",s=e?.key??"";switch(r.name){case"ConstraintError":return new Y(t,s,r);case"QuotaExceededError":return new we(r);case"TransactionInactiveError":return new $("TRANSACTION_INACTIVE",r.message||"Transaction is not active",r);case"AbortError":return new $("TRANSACTION_ABORTED",r.message||"Transaction was aborted",r);case"VersionError":return new Ee(r.message||"Version error",r);case"DataError":return new ve(r.message||"Data error",r);case"InvalidStateError":return new L(r.message||"Invalid state",r);case"ReadOnlyError":return new xe(r.message||"Attempted write in read-only transaction",r);case"NotFoundError":return new N("NOT_FOUND",r.message||"Object store or index not found",r);case"TimeoutError":return new Ce(r.message||"Operation timed out",r);default:return new N("UNKNOWN_ERROR",r.message||`Unknown error: ${r.name}`,r)}}function Ae(r){return r instanceof N}function Z(r){return r instanceof P}function ee(r){return r instanceof Y}function Se(r,e){return r instanceof N&&r.code===e}function te(r){return typeof r=="string"?`"${r}"`:typeof r=="number"?String(r):r instanceof Date?r.toISOString():Array.isArray(r)?`[${r.map(te).join(", ")}]`:r instanceof ArrayBuffer||ArrayBuffer.isView(r)?"[Binary Data]":String(r)}const le="id",ue=!1,K={DATABASE_NOT_OPEN:"Database connection is not open",DATABASE_CLOSED:"Database connection has been closed",STORE_NOT_FOUND:r=>`Object store "${r}" not found`,INDEX_NOT_FOUND:r=>`Index "${r}" not found`,TRANSACTION_INACTIVE:"Transaction is no longer active",TRANSACTION_MODE_MISMATCH:"Operation requires readwrite transaction",INVALID_KEY:"Invalid key type for this operation",NATIVE_ACCESS_NO_TRANSACTION:"Native store access requires active transaction",UPGRADE_BLOCKED:"Database upgrade blocked by other connections",UPGRADE_FAILED:"Database upgrade failed",OPEN_FAILED:"Failed to open database"};function se(r){return new Promise((e,t)=>{r.oncomplete=()=>e(),r.onerror=()=>{t(T(r.error))},r.onabort=()=>{t(new $("TRANSACTION_ABORTED",r.error?.message??"Transaction was aborted",r.error))}})}function de(r){if(r==null)return!1;const e=typeof r;return e==="number"?!Number.isNaN(r):e==="string"?!0:r instanceof Date?!Number.isNaN(r.getTime()):r instanceof ArrayBuffer||ArrayBuffer.isView(r)?!0:Array.isArray(r)?r.every(de):!1}function re(r){return Array.isArray(r)?r:[r]}function ke(r){return typeof r=="number"&&Number.isInteger(r)&&r>0}function Te(r){if(!ke(r))throw new Error(`Database version must be a positive integer, got: ${String(r)}`)}function Ne(r){if(r.length===0)throw new Error("Database name must be a non-empty string")}function I(r){return r===void 0?"next":r==="previous"?"prev":r==="previousunique"?"prevunique":r}function me(r){return r==="prev"?"previous":r==="prevunique"?"previousunique":r}class M{#t;#e;constructor(e,t){this.#t=e,this.#e=t}get native(){return this.#t}getKey(){return this.#t.key}getPrimaryKey(){return this.#t.primaryKey}getValue(){return this.#t.value}getDirection(){return me(this.#t.direction)}async continue(e){return new Promise((t,s)=>{this.#e.onsuccess=()=>{const n=this.#e.result;t(n?new M(n,this.#e):null)},this.#e.onerror=()=>s(T(this.#e.error)),e!==void 0?this.#t.continue(e):this.#t.continue()})}async continuePrimaryKey(e,t){return new Promise((s,n)=>{this.#e.onsuccess=()=>{const a=this.#e.result;s(a?new M(a,this.#e):null)},this.#e.onerror=()=>n(T(this.#e.error)),this.#t.continuePrimaryKey(e,t)})}async advance(e){return new Promise((t,s)=>{this.#e.onsuccess=()=>{const n=this.#e.result;t(n?new M(n,this.#e):null)},this.#e.onerror=()=>s(T(this.#e.error)),this.#t.advance(e)})}async update(e){return new Promise((t,s)=>{const n=this.#t.update(e);n.onsuccess=()=>t(n.result),n.onerror=()=>s(T(n.error))})}async delete(){return new Promise((e,t)=>{const s=this.#t.delete();s.onsuccess=()=>e(),s.onerror=()=>t(T(s.error))})}}class B{#t;#e;constructor(e,t){this.#t=e,this.#e=t}get native(){return this.#t}getKey(){return this.#t.key}getPrimaryKey(){return this.#t.primaryKey}getDirection(){return me(this.#t.direction)}async continue(e){return new Promise((t,s)=>{this.#e.onsuccess=()=>{const n=this.#e.result;t(n?new B(n,this.#e):null)},this.#e.onerror=()=>s(T(this.#e.error)),e!==void 0?this.#t.continue(e):this.#t.continue()})}async continuePrimaryKey(e,t){return new Promise((s,n)=>{this.#e.onsuccess=()=>{const a=this.#e.result;s(a?new B(a,this.#e):null)},this.#e.onerror=()=>n(T(this.#e.error)),this.#t.continuePrimaryKey(e,t)})}async advance(e){return new Promise((t,s)=>{this.#e.onsuccess=()=>{const n=this.#e.result;t(n?new B(n,this.#e):null)},this.#e.onerror=()=>s(T(this.#e.error)),this.#t.advance(e)})}}function qe(){return{keyPath:null,range:null,anyOfValues:null,filters:[],direction:"ascending",limitCount:null,offsetCount:0}}class k{#t;#e;constructor(e,t){this.#t=e,this.#e=t??qe()}where(e){return new De(this.#t,{...this.#e,keyPath:e})}filter(e){return new k(this.#t,{...this.#e,filters:[...this.#e.filters,e]})}orderBy(e){return new k(this.#t,{...this.#e,direction:e})}limit(e){return new k(this.#t,{...this.#e,limitCount:e})}offset(e){return new k(this.#t,{...this.#e,offsetCount:e})}async toArray(){const e=[];for await(const t of this.iterate())e.push(t);return e}async first(){const t=await new k(this.#t,{...this.#e,limitCount:1}).iterate().next();return t.done?void 0:t.value}async count(){if(this.#e.filters.length===0&&this.#e.anyOfValues===null){const n=(await this.#t.ensureOpen()).transaction([this.#t.storeName],"readonly").objectStore(this.#t.storeName),o=this.#s(n).count(this.#e.range??void 0);return this.#o(o)}let e=0;for await(const t of this.iterate())e++;return e}async keys(){const e=[],n=(await this.#t.ensureOpen()).transaction([this.#t.storeName],"readonly").objectStore(this.#t.storeName),a=this.#s(n),o=I(this.#e.direction==="ascending"?"next":"previous");if(this.#e.anyOfValues!==null){const m=await this.#i(n);return this.#l(m)}const i=a.openKeyCursor(this.#e.range??void 0,o);let c=0,l=0,u=await this.#o(i);for(;u;){if(c<this.#e.offsetCount){c++,u.continue(),u=await this.#o(i);continue}if(this.#e.limitCount!==null&&l>=this.#e.limitCount)break;if(this.#e.filters.length>0){const m=n.get(u.primaryKey),d=await this.#o(m);d!==void 0&&this.#n(d)&&(e.push(u.primaryKey),l++)}else e.push(u.primaryKey),l++;u.continue(),u=await this.#o(i)}return e}async*iterate(){const s=(await this.#t.ensureOpen()).transaction([this.#t.storeName],"readonly").objectStore(this.#t.storeName);if(this.#e.anyOfValues!==null){const u=await this.#r(s),m=this.#l(u);for(const d of m)yield d;return}const n=this.#s(s),a=I(this.#e.direction==="ascending"?"next":"previous"),o=n.openCursor(this.#e.range??void 0,a);let i=0,c=0,l=await this.#o(o);for(;l;){const u=l.value;if(!this.#n(u)){l.continue(),l=await this.#o(o);continue}if(i<this.#e.offsetCount){i++,l.continue(),l=await this.#o(o);continue}if(this.#e.limitCount!==null&&c>=this.#e.limitCount)break;yield u,c++,l.continue(),l=await this.#o(o)}}#s(e){const t=this.#e.keyPath;if(t===null||t===this.#t.primaryKeyPath)return e;if(this.#t.indexNames.includes(t))return e.index(t);for(const s of this.#t.indexNames)try{const n=e.index(s);if(n.keyPath===t)return n}catch{}return e}#n(e){for(const t of this.#e.filters)if(!t(e))return!1;return!0}async#r(e){if(this.#e.anyOfValues===null)return[];const t=this.#e.keyPath,s=new Map,n=this.#e.anyOfValues.map(async o=>{let i=[];if(t===null||t===this.#t.primaryKeyPath){const c=await this.#o(e.get(o));i=c?[c]:[]}else if(this.#t.indexNames.includes(t)){const c=e.index(t);i=await this.#o(c.getAll(o))}else for(const c of this.#t.indexNames)try{const l=e.index(c);if(l.keyPath===t){i=await this.#o(l.getAll(o));break}}catch{}for(const c of i)if(this.#n(c)){const l=this.#a(c);l!==void 0&&s.set(this.#c(l),c)}});await Promise.all(n);const a=Array.from(s.values());return this.#e.direction==="descending"&&a.reverse(),a}async#i(e){if(this.#e.anyOfValues===null)return[];const t=this.#e.keyPath,s=new Set,n=[],a=this.#e.anyOfValues.map(async o=>{let i;if(t===null||t===this.#t.primaryKeyPath)i=await this.#o(e.count(o))>0?[o]:[];else if(this.#t.indexNames.includes(t)){const c=e.index(t);i=await this.#o(c.getAllKeys(o))}else i=[];for(const c of i){const l=this.#c(c);s.has(l)||(s.add(l),n.push(c))}});return await Promise.all(a),this.#e.direction==="descending"&&n.reverse(),n}#a(e){const t=this.#t.primaryKeyPath;if(!(t===null||typeof e!="object"||e===null))return e[t]}#l(e){let t=e;return this.#e.offsetCount>0&&(t=t.slice(this.#e.offsetCount)),this.#e.limitCount!==null&&(t=t.slice(0,this.#e.limitCount)),t}#o(e){return new Promise((t,s)=>{e.onsuccess=()=>t(e.result),e.onerror=()=>s(T(e.error,{storeName:this.#t.storeName}))})}#c(e){return typeof e=="string"?e:typeof e=="number"?`n:${e}`:e instanceof Date?`d:${e.getTime()}`:e instanceof ArrayBuffer?`b:${Array.from(new Uint8Array(e)).join(",")}`:ArrayBuffer.isView(e)?`b:${Array.from(new Uint8Array(e.buffer)).join(",")}`:Array.isArray(e)?`a:${JSON.stringify(e)}`:JSON.stringify(e)}}class De{#t;#e;constructor(e,t){this.#t=e,this.#e=t}equals(e){return de(e)?new k(this.#t,{...this.#e,range:IDBKeyRange.only(e)}):this.#s(e,t=>t===e)}#s(e,t){const s=this.#e.keyPath,n=a=>{if(s===null||typeof a!="object"||a===null)return!1;const o=a[s];return t(o)};return new k(this.#t,{...this.#e,keyPath:null,filters:[...this.#e.filters,n]})}greaterThan(e){return new k(this.#t,{...this.#e,range:IDBKeyRange.lowerBound(e,!0)})}greaterThanOrEqual(e){return new k(this.#t,{...this.#e,range:IDBKeyRange.lowerBound(e,!1)})}lessThan(e){return new k(this.#t,{...this.#e,range:IDBKeyRange.upperBound(e,!0)})}lessThanOrEqual(e){return new k(this.#t,{...this.#e,range:IDBKeyRange.upperBound(e,!1)})}between(e,t,s){return new k(this.#t,{...this.#e,range:IDBKeyRange.bound(e,t,s?.lowerOpen??!1,s?.upperOpen??!1)})}startsWith(e){return new k(this.#t,{...this.#e,range:IDBKeyRange.bound(e,e+"￿",!1,!1)})}anyOf(e){return new k(this.#t,{...this.#e,anyOfValues:e})}}class he{#t;#e;#s;#n;constructor(e,t,s,n){this.#t=e,this.#e=t,this.#s=s,this.#n=n}get native(){throw new Error("Index.native requires active transaction. Use openCursor() or iterate().")}getName(){return this.#e}getKeyPath(){return this.#s.keyPath}isUnique(){return this.#s.unique??!1}isMultiEntry(){return this.#s.multiEntry??!1}async get(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e);return Array.isArray(e)?await Promise.all(e.map(o=>this.#r(a.get(o)))):this.#r(a.get(e))}async resolve(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e);if(Array.isArray(e))return await Promise.all(e.map(async i=>{const c=await this.#r(a.get(i));if(c===void 0)throw new P(this.#t,i);return c}));const o=await this.#r(a.get(e));if(o===void 0)throw new P(this.#t,e);return o}async getKey(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e);return this.#r(a.getKey(e))}async all(e,t){const o=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e);return this.#r(o.getAll(e??void 0,t))}async keys(e,t){const o=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e);return this.#r(o.getAllKeys(e??void 0,t))}async count(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e);return this.#r(a.count(e))}query(){return new k({storeName:this.#t,primaryKeyPath:null,indexNames:[this.#e],ensureOpen:this.#n})}async*iterate(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e),o=I(e?.direction),i=a.openCursor(e?.query??null,o);let c=await this.#r(i);for(;c;){yield c.value;const l=new Promise(u=>{i.onsuccess=()=>u(i.result)});c.continue(),c=await l}}async*iterateKeys(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e),o=I(e?.direction),i=a.openKeyCursor(e?.query??null,o);let c=await this.#r(i);for(;c;){yield c.key;const l=new Promise(u=>{i.onsuccess=()=>u(i.result)});c.continue(),c=await l}}async openCursor(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e),o=I(e?.direction),i=a.openCursor(e?.query??null,o),c=await this.#r(i);return c?new M(c,i):null}async openKeyCursor(e){const a=(await this.#n()).transaction([this.#t],"readonly").objectStore(this.#t).index(this.#e),o=I(e?.direction),i=a.openKeyCursor(e?.query??null,o),c=await this.#r(i);return c?new B(c,i):null}#r(e){return new Promise((t,s)=>{e.onsuccess=()=>t(e.result),e.onerror=()=>s(T(e.error,{storeName:this.#t}))})}}class Ie{#t;#e;#s;#n=new Set;constructor(e,t,s){this.#t=e,this.#e=t,this.#s=s}get native(){throw new Error(K.NATIVE_ACCESS_NO_TRANSACTION)}getName(){return this.#e}getKeyPath(){return this.#s.keyPath===void 0?le:this.#s.keyPath}getIndexNames(){return(this.#s.indexes??[]).map(e=>e.name)}hasAutoIncrement(){return this.#s.autoIncrement??ue}async get(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e);return Array.isArray(e)?await Promise.all(e.map(a=>this.#r(n.get(a)))):this.#r(n.get(e))}async resolve(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e);if(Array.isArray(e))return await Promise.all(e.map(async o=>{const i=await this.#r(n.get(o));if(i===void 0)throw new P(this.#e,o);return i}));const a=await this.#r(n.get(e));if(a===void 0)throw new P(this.#e,e);return a}async has(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e);return Array.isArray(e)?await Promise.all(e.map(async o=>await this.#r(n.count(o))>0)):await this.#r(n.count(e))>0}async set(e,t){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readwrite"),a=n.objectStore(this.#e);if(Array.isArray(e)){const i=await Promise.all(e.map(c=>this.#r(a.put(c))));return await this.#i(n),this.#a("set",i),i}const o=await this.#r(a.put(e,t));return await this.#i(n),this.#a("set",[o]),o}async add(e,t){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readwrite"),a=n.objectStore(this.#e);if(Array.isArray(e)){const i=await Promise.all(e.map(c=>this.#r(a.add(c))));return await this.#i(n),this.#a("add",i),i}const o=await this.#r(a.add(e,t));return await this.#i(n),this.#a("add",[o]),o}async remove(e){const s=(await this.#t.ensureOpen()).transaction([this.#e],"readwrite"),n=s.objectStore(this.#e);if(Array.isArray(e)){await Promise.all(e.map(a=>this.#r(n.delete(a)))),await this.#i(s),this.#a("remove",e.map(a=>a));return}await this.#r(n.delete(e)),await this.#i(s),this.#a("remove",[e])}async all(e,t){const a=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e);return this.#r(a.getAll(e??void 0,t))}async keys(e,t){const a=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e);return this.#r(a.getAllKeys(e??void 0,t))}async clear(){const t=(await this.#t.ensureOpen()).transaction([this.#e],"readwrite"),s=t.objectStore(this.#e);await this.#r(s.clear()),await this.#i(t),this.#a("clear",[])}async count(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e);return this.#r(n.count(e))}index(e){const s=(this.#s.indexes??[]).find(n=>n.name===e);if(!s)throw new Error(`Index "${e}" not found on store "${this.#e}"`);return new he(this.#e,e,s,()=>this.#t.ensureOpen())}query(){const e=this.getKeyPath();return new k({storeName:this.#e,primaryKeyPath:typeof e=="string"?e:null,indexNames:this.getIndexNames(),ensureOpen:()=>this.#t.ensureOpen()})}async*iterate(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e),a=I(e?.direction),o=n.openCursor(e?.query??null,a);let i=await this.#r(o);for(;i;){yield i.value;const c=new Promise(l=>{o.onsuccess=()=>l(o.result)});i.continue(),i=await c}}async*iterateKeys(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e),a=I(e?.direction),o=n.openKeyCursor(e?.query??null,a);let i=await this.#r(o);for(;i;){yield i.key;const c=new Promise(l=>{o.onsuccess=()=>l(o.result)});i.continue(),i=await c}}async openCursor(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e),a=I(e?.direction),o=n.openCursor(e?.query??null,a),i=await this.#r(o);return i?new M(i,o):null}async openKeyCursor(e){const n=(await this.#t.ensureOpen()).transaction([this.#e],"readonly").objectStore(this.#e),a=I(e?.direction),o=n.openKeyCursor(e?.query??null,a),i=await this.#r(o);return i?new B(i,o):null}onChange(e){return this.#n.add(e),()=>this.#n.delete(e)}#r(e){return new Promise((t,s)=>{e.onsuccess=()=>t(e.result),e.onerror=()=>s(T(e.error,{storeName:this.#e}))})}#i(e){return new Promise((t,s)=>{e.oncomplete=()=>t(),e.onerror=()=>s(T(e.error)),e.onabort=()=>s(T(e.error))})}#a(e,t){const s={storeName:this.#e,type:e,keys:t,source:"local"};for(const n of this.#n)try{n(s)}catch{}this.#t.emitChange(s)}emitRemoteChange(e){for(const t of this.#n)try{t(e)}catch{}}}class Oe{#t;#e;constructor(e,t){this.#t=e,this.#e=t}get native(){return this.#t}async get(e){return Array.isArray(e)?Promise.all(e.map(t=>this.#s(this.#t.get(t)))):this.#s(this.#t.get(e))}async resolve(e){if(Array.isArray(e))return Promise.all(e.map(async s=>{const n=await this.#s(this.#t.get(s));if(n===void 0)throw new P(this.#e,s);return n}));const t=await this.#s(this.#t.get(e));if(t===void 0)throw new P(this.#e,e);return t}async set(e,t){return Array.isArray(e)?Promise.all(e.map(s=>this.#s(this.#t.put(s)))):this.#s(this.#t.put(e,t))}async add(e,t){return Array.isArray(e)?Promise.all(e.map(s=>this.#s(this.#t.add(s)))):this.#s(this.#t.add(e,t))}async remove(e){if(Array.isArray(e)){await Promise.all(e.map(t=>this.#s(this.#t.delete(t))));return}await this.#s(this.#t.delete(e))}async all(e,t){return this.#s(this.#t.getAll(e??void 0,t))}async keys(e,t){return this.#s(this.#t.getAllKeys(e??void 0,t))}async clear(){await this.#s(this.#t.clear())}async count(e){return this.#s(this.#t.count(e))}index(e){if(!this.#t.indexNames.contains(e))throw new Error(`Index "${e}" not found on store "${this.#e}"`);const t=this.#t.index(e),s={name:t.name,keyPath:t.keyPath,unique:t.unique,multiEntry:t.multiEntry},n=this.#t.transaction.db;return new he(this.#e,e,s,()=>Promise.resolve(n))}async openCursor(e){const t=I(e?.direction),s=this.#t.openCursor(e?.query??null,t),n=await this.#s(s);return n?new M(n,s):null}async openKeyCursor(e){const t=I(e?.direction),s=this.#t.openKeyCursor(e?.query??null,t),n=await this.#s(s);return n?new B(n,s):null}#s(e){return new Promise((t,s)=>{e.onsuccess=()=>t(e.result),e.onerror=()=>s(T(e.error,{storeName:this.#e}))})}}class ne{#t;#e;#s=!0;#n=!1;constructor(e){this.#t=e,this.#e=Array.from(e.objectStoreNames),e.oncomplete=()=>{this.#s=!1,this.#n=!0},e.onabort=()=>{this.#s=!1,this.#n=!0},e.onerror=()=>{this.#s=!1,this.#n=!0}}get native(){return this.#t}getMode(){return this.#t.mode}getStoreNames(){return this.#e}isActive(){return this.#s}isFinished(){return this.#n}store(e){if(!this.#e.includes(e))throw new $("INVALID_STATE",`Store "${e}" is not in transaction scope. Scoped stores: ${this.#e.join(", ")}`);if(!this.#s)throw new $("TRANSACTION_INACTIVE","Transaction is no longer active");const t=this.#t.objectStore(e);return new Oe(t,e)}abort(){if(this.#n)throw new $("INVALID_STATE","Cannot abort: transaction already finished");this.#t.abort(),this.#s=!1,this.#n=!0}commit(){if(this.#n)throw new $("INVALID_STATE","Cannot commit: transaction already finished");typeof this.#t.commit=="function"&&this.#t.commit()}}class Re{#t;#e;#s;#n;#r;#i;#a=null;#l=null;#o=!1;#c=null;#u=new Set;#m=new Set;#h=new Set;#d=new Set;#p=new Map;constructor(e){Ne(e.name),Te(e.version),this.#t=e.name,this.#e=e.version,this.#s=e.stores,this.#n=e.migrations??[],this.#r=e.onBlocked,this.#i=e.crossTabSync!==!1,this.#i&&typeof BroadcastChannel<"u"&&(this.#c=new BroadcastChannel(`idb:${e.name}`),this.#c.onmessage=t=>{this.#g(t.data)}),this.#t=e.name,this.#e=e.version,this.#s=e.stores,this.#n=e.migrations??[],this.#r=e.onBlocked,e.onChange&&this.#u.add(e.onChange),e.onError&&this.#m.add(e.onError),e.onVersionChange&&this.#h.add(e.onVersionChange),e.onClose&&this.#d.add(e.onClose)}get native(){if(!this.#a)throw new L(K.DATABASE_NOT_OPEN);return this.#a}getName(){return this.#t}getVersion(){return this.#e}getStoreNames(){return this.#a?Array.from(this.#a.objectStoreNames):Object.keys(this.#s)}isOpen(){return this.#a!==null&&!this.#o}store(e){if(!(e in this.#s))throw new L(K.STORE_NOT_FOUND(e));let t=this.#p.get(e);return t||(t=new Ie(this,e,this.#s[e]),this.#p.set(e,t)),t}async read(e,t){const s=await this.ensureOpen(),n=re(e),a=s.transaction([...n],"readonly"),o=new ne(a);try{await t(o),await se(a)}catch(i){if(o.isActive())try{o.abort()}catch{}throw i}}async write(e,t,s){const n=await this.ensureOpen(),a=re(e),o=s?.durability?{durability:s.durability}:void 0,i=[...a],c=o?n.transaction(i,"readwrite",o):n.transaction(i,"readwrite"),l=new ne(c);try{await t(l),await se(c)}catch(u){if(l.isActive())try{l.abort()}catch{}throw u}}close(){this.#c&&(this.#c.close(),this.#c=null),this.#a&&(this.#a.close(),this.#a=null),this.#o=!0,this.#l=null;for(const e of this.#d)try{e()}catch{}}async drop(){return this.close(),new Promise((e,t)=>{const s=indexedDB.deleteDatabase(this.#t);s.onsuccess=()=>e(),s.onerror=()=>t(T(s.error)),s.onblocked=()=>{}})}onChange(e){return this.#u.add(e),()=>this.#u.delete(e)}onError(e){return this.#m.add(e),()=>this.#m.delete(e)}onVersionChange(e){return this.#h.add(e),()=>this.#h.delete(e)}onClose(e){return this.#d.add(e),()=>this.#d.delete(e)}async ensureOpen(){if(this.#o)throw new L(K.DATABASE_CLOSED);if(this.#a)return this.#a;if(this.#l)return this.#l;this.#l=this.#f();try{return this.#a=await this.#l,this.#a}catch(e){throw this.#l=null,e}}emitChange(e){for(const t of this.#u)try{t(e)}catch(s){this.#y(s instanceof Error?s:new Error(String(s)))}if(e.source==="local"&&this.#c)try{this.#c.postMessage(e)}catch{}}#g(e){const t={...e,source:"remote"};for(const n of this.#u)try{n(t)}catch(a){this.#y(a instanceof Error?a:new Error(String(a)))}const s=this.#p.get(e.storeName);s&&s.emitRemoteChange(t)}async#f(){return new Promise((e,t)=>{const s=indexedDB.open(this.#t,this.#e);s.onerror=()=>{t(new be(`Failed to open database "${this.#t}"`,s.error))},s.onsuccess=()=>{const n=s.result;this.#w(n),e(n)},s.onupgradeneeded=n=>{const a=s.result,o=s.transaction;if(!o){t(new Q("UPGRADE_FAILED","No transaction available during upgrade"));return}try{this.#b(a,o,n.oldVersion,n.newVersion??this.#e)}catch(i){o.abort(),t(i instanceof Q?i:new Q("UPGRADE_FAILED",i instanceof Error?i.message:"Upgrade failed",i))}},s.onblocked=n=>{this.#r&&this.#r({oldVersion:n.oldVersion,newVersion:n.newVersion??this.#e})}})}#w(e){e.onversionchange=t=>{for(const s of this.#h)try{s({oldVersion:t.oldVersion,newVersion:t.newVersion})}catch{}},e.onclose=()=>{this.#a=null,this.#o=!0;for(const t of this.#d)try{t()}catch{}},e.onerror=t=>{const n=t.target?.error??new Error("Unknown database error");this.#y(n instanceof Error?n:new Error(String(n)))}}#b(e,t,s,n){for(const[o,i]of Object.entries(this.#s))e.objectStoreNames.contains(o)||this.#v(e,o,i);const a=this.#n.filter(o=>o.version>s&&o.version<=n).sort((o,i)=>o.version-i.version);for(const o of a)o.migrate({database:e,transaction:t,oldVersion:s,newVersion:n})}#v(e,t,s){const n=s.keyPath===void 0?le:s.keyPath,o={autoIncrement:s.autoIncrement??ue};n!==null&&(o.keyPath=n);const i=e.createObjectStore(t,o);for(const c of s.indexes??[])this.#x(i,c)}#x(e,t){e.createIndex(t.name,t.keyPath,{unique:t.unique??!1,multiEntry:t.multiEntry??!1})}#y(e){for(const t of this.#m)try{t(e)}catch{}}}function Pe(r){return new Re(r)}function $e(){return Pe({name:"showcase-db",version:1,stores:{users:{indexes:[{name:"byEmail",keyPath:"email",unique:!0},{name:"byStatus",keyPath:"status"},{name:"byRole",keyPath:"role"},{name:"byAge",keyPath:"age"},{name:"byTags",keyPath:"tags",multiEntry:!0},{name:"byCreatedAt",keyPath:"createdAt"}]},posts:{indexes:[{name:"byAuthor",keyPath:"authorId"},{name:"byPublished",keyPath:"published"},{name:"byViews",keyPath:"views"},{name:"byCreatedAt",keyPath:"createdAt"}]},settings:{indexes:[{name:"byKey",keyPath:"key",unique:!0},{name:"byUpdatedAt",keyPath:"updatedAt"}]}},crossTabSync:!0})}async function Ue(r){const e=r.store("users"),t=await e.get("u1"),s=await e.get("nonexistent"),n=["u1","u2","nonexistent"],a=await e.get(n);return{success:!0,message:"get() returns undefined for missing records",data:{single:t?.name??"undefined",missing:s===void 0?"undefined (as expected)":"found",batch:a.map(o=>o?.name??"undefined")},code:`
+// Single key lookup - returns T | undefined
+const user = await store.get('u1')
+if (user) {
+  console.log(user.name)  // Safe to access
+}
+
+// Missing key returns undefined (no error)
+const missing = await store.get('nonexistent')  // undefined
+
+// Batch lookup - some may be undefined
+const users = await store.get(['u1', 'u2', 'nonexistent'])
+// users[2] is undefined
+`.trim()}}async function Me(r){const e=r.store("users");let t="";const s=await e.resolve("u1");try{await e.resolve("nonexistent")}catch(n){Z(n)&&(t=`NotFoundError: Key "${JSON.stringify(n.key)}" not found in "${n.storeName}"`)}return{success:!0,message:"resolve() throws NotFoundError for missing records",data:{found:s.name,error:t},code:`
+// resolve() throws if record doesn't exist
+try {
+  const user = await store.resolve('u1')
+  console.log(user.name)  // Guaranteed to exist
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.log(\`Key \${error.key} not found in \${error.storeName}\`)
+  }
+}
+
+// Batch resolve - throws if ANY is missing
+const users = await store.resolve(['u1', 'u2', 'u3'])
+`.trim()}}async function Be(r){const e=r.store("users"),t=await e.set({id:"demo-user",name:"Demo User",email:"demo@example.com",age:30,status:"active",role:"user",tags:["demo"],createdAt:Date.now()});await e.set({id:"demo-user",name:"Demo User (Updated)",email:"demo@example.com",age:31,status:"active",role:"user",tags:["demo","updated"],createdAt:Date.now()});const s=await e.set([...J]);return await e.remove("demo-user"),{success:!0,message:"set() upserts records (insert or update)",data:{singleKey:t,batchKeys:s},code:`
+// Single record - insert or update (upsert)
+const key = await store.set({ id: 'u1', name: 'Alice', ... })
+
+// Update existing record (same key)
+await store.set({ id: 'u1', name: 'Alice (Updated)', ... })
+
+// Batch set - single transaction, atomic
+const keys = await store.set([user1, user2, user3])
+`.trim()}}async function Le(r){const e=r.store("users");let t="";const s={id:"new-user",name:"New User",email:"new@example.com",age:25,status:"active",role:"guest",tags:["new"],createdAt:Date.now()},n=await e.add(s);try{await e.add(s)}catch(a){ee(a)&&(t=`ConstraintError: Key "${JSON.stringify(a.key)}" already exists`)}return await e.remove("new-user"),{success:!0,message:"add() throws ConstraintError if key exists",data:{addedKey:n,duplicateError:t},code:`
+// add() inserts only - throws if key exists
+try {
+  await store.add({ id: 'u1', name: 'Alice' })
+} catch (error) {
+  if (error instanceof ConstraintError) {
+    console.log('User already exists, updating instead')
+    await store.set({ id: 'u1', name: 'Alice' })
+  }
+}
+
+// Batch add - fails if ANY key exists
+await store.add([user1, user2, user3])
+`.trim()}}async function Ke(r){const e=r.store("users");await e.set({id:"to-delete",name:"To Delete",email:"delete@example.com",age:0,status:"inactive",role:"guest",tags:[],createdAt:Date.now()});const t=await e.count();await e.remove("to-delete"),await e.remove("nonexistent");const s=await e.count();return{success:!0,message:"remove() silently succeeds for missing keys",data:{beforeCount:t,afterCount:s,difference:t-s},code:`
+// Single key remove
+await store.remove('u1')
+
+// Removing nonexistent key - no error
+await store.remove('nonexistent')  // Silently succeeds
+
+// Batch remove
+await store.remove(['u1', 'u2', 'u3'])
+`.trim()}}async function Fe(r){const e=r.store("users"),t=await e.has("u1"),s=await e.has("nonexistent"),n=await e.has(["u1","u2","nonexistent"]);return{success:!0,message:"has() checks if records exist",data:{exists:t,missing:s,batchChecks:n},code:`
+// Single key existence check
+const exists = await store.has('u1')  // true
+
+// Missing key
+const missing = await store.has('nonexistent')  // false
+
+// Batch check
+const checks = await store.has(['u1', 'u2', 'nonexistent'])
+// [true, true, false]
+`.trim()}}async function _e(r){const e=r.store("users"),t=await e.all(),s=await e.all(null,3),n=await e.keys(),a=await e.count();return{success:!0,message:"Bulk operations: all(), keys(), count()",data:{allCount:t.length,first3Names:s.map(o=>o.name),allKeys:n,count:a},code:`
+// Get all records
+const allUsers = await store.all()
+
+// Get all with limit
+const first3 = await store.all(null, 3)
+
+// With key range
+const range = IDBKeyRange.bound('a', 'z')
+const subset = await store.all(range)
+
+// Get all keys
+const allKeys = await store.keys()
+
+// Count records
+const count = await store.count()
+
+// Clear all records (dangerous!)
+// await store.clear()
+`.trim()}}function Ve(r){const e=r.store("users");return{success:!0,message:"Store accessor methods",data:{name:e.getName(),keyPath:e.getKeyPath(),indexNames:e.getIndexNames(),autoIncrement:e.hasAutoIncrement()},code:`
+const store = db.store('users')
+
+store.getName()           // 'users'
+store.getKeyPath()        // 'id'
+store.getIndexNames()     // ['byEmail', 'byStatus', ...]
+store.hasAutoIncrement()  // false
+`.trim()}}function je(r){const e=r.store("users"),t=e.index("byEmail"),s=e.index("byStatus"),n=e.index("byTags");return{success:!0,message:"Index accessor methods",data:{emailIndex:{name:t.getName(),keyPath:t.getKeyPath(),unique:t.isUnique(),multiEntry:t.isMultiEntry()},statusIndex:{name:s.getName(),keyPath:s.getKeyPath(),unique:s.isUnique(),multiEntry:s.isMultiEntry()},tagsIndex:{name:n.getName(),keyPath:n.getKeyPath(),unique:n.isUnique(),multiEntry:n.isMultiEntry()}},code:`
+const emailIndex = store.index('byEmail')
+
+emailIndex.getName()      // 'byEmail'
+emailIndex.getKeyPath()   // 'email'
+emailIndex.isUnique()     // true
+emailIndex.isMultiEntry() // false
+
+// Multi-entry index for arrays
+const tagsIndex = store.index('byTags')
+tagsIndex.isMultiEntry()  // true
+`.trim()}}async function He(r){const t=r.store("users").index("byEmail"),s=await t.get("alice@example.com"),n=await t.get("nonexistent@example.com");let a="";try{await t.resolve("nonexistent@example.com")}catch{a="NotFoundError thrown as expected"}const o=await t.getKey("alice@example.com");return{success:!0,message:"Index lookup operations",data:{userByEmail:s?.name??"not found",missing:n===void 0?"undefined (correct)":"found",resolveError:a,primaryKey:o},code:`
+const emailIndex = store.index('byEmail')
+
+// Get by index key (returns first match)
+const user = await emailIndex.get('alice@example.com')
+
+// Returns undefined for missing
+const missing = await emailIndex.get('nonexistent@example.com')  // undefined
+
+// resolve throws for missing
+const user = await emailIndex.resolve('alice@example.com')  // Throws if not found
+
+// Get primary key for an index key
+const primaryKey = await emailIndex.getKey('alice@example.com')  // 'u1'
+`.trim()}}async function Ge(r){const t=r.store("users").index("byStatus"),s=await t.all(IDBKeyRange.only("active")),n=await t.all(IDBKeyRange.only("inactive")),a=await t.count("active"),o=await t.count("inactive");return{success:!0,message:"Non-unique index queries",data:{activeUsers:s.map(i=>i.name),inactiveUsers:n.map(i=>i.name),activeCount:a,inactiveCount:o},code:`
+const statusIndex = store.index('byStatus')
+
+// Get all matching a specific value
+const activeUsers = await statusIndex.all(IDBKeyRange.only('active'))
+
+// Count records with specific index value
+const activeCount = await statusIndex.count('active')
+const inactiveCount = await statusIndex.count('inactive')
+`.trim()}}async function Qe(r){const t=r.store("users").index("byTags"),s=await t.all(IDBKeyRange.only("developer")),n=await t.all(IDBKeyRange.only("designer"));return{success:!0,message:"Multi-entry index for arrays",data:{developersCount:s.length,developers:s.map(a=>({name:a.name,tags:a.tags})),designersCount:n.length,designers:n.map(a=>({name:a.name,tags:a.tags}))},code:`
+// Multi-entry index indexes each array element separately
+// User: { tags: ['developer', 'leader'] }
+// Creates index entries for both 'developer' AND 'leader'
+
+const tagsIndex = store.index('byTags')  // multiEntry: true
+
+// Find all users with 'developer' tag
+const developers = await tagsIndex.all(IDBKeyRange.only('developer'))
+
+// Find all users with 'designer' tag
+const designers = await tagsIndex.all(IDBKeyRange.only('designer'))
+`.trim()}}async function We(r){const t=r.store("users").index("byAge"),s=await t.all(IDBKeyRange.lowerBound(30)),n=await t.all(IDBKeyRange.upperBound(30,!0)),a=await t.all(IDBKeyRange.bound(25,35));return{success:!0,message:"Index range queries",data:{over30:s.map(o=>({name:o.name,age:o.age})),under30:n.map(o=>({name:o.name,age:o.age})),between25And35:a.map(o=>({name:o.name,age:o.age}))},code:`
+const ageIndex = store.index('byAge')
+
+// Users over 30
+const over30 = await ageIndex.all(IDBKeyRange.lowerBound(30))
+
+// Users under 30 (exclusive)
+const under30 = await ageIndex.all(IDBKeyRange.upperBound(30, true))
+
+// Users between 25 and 35 (inclusive)
+const between25And35 = await ageIndex.all(IDBKeyRange.bound(25, 35))
+`.trim()}}function ze(r){const s=r.store("users").index("byEmail").native;return{success:!0,message:"Native IDBIndex access",data:{nativeName:s.name,nativeKeyPath:s.keyPath,nativeUnique:s.unique,nativeMultiEntry:s.multiEntry},code:`
+const emailIndex = store.index('byEmail')
+
+// Access native IDBIndex for advanced operations
+const nativeIndex = emailIndex.native
+
+// Use native APIs
+nativeIndex.name        // 'byEmail'
+nativeIndex.keyPath     // 'email'
+nativeIndex.unique      // true
+nativeIndex.multiEntry  // false
+`.trim()}}async function Je(r){const e=r.store("users"),t=await e.query().where("byStatus").equals("active").toArray(),s=await e.query().where("byRole").equals("admin").toArray();return{success:!0,message:"where().equals() - Fast indexed queries",data:{activeUsers:t.map(n=>n.name),admins:s.map(n=>n.name)},code:`
+// Fast indexed query using where().equals()
+const activeUsers = await store.query()
+  .where('byStatus').equals('active')
+  .toArray()
+
+// Query by role
+const admins = await store.query()
+  .where('byRole').equals('admin')
+  .toArray()
+
+// Note: Uses IDBKeyRange.only() internally for performance
+`.trim()}}async function Xe(r){const e=r.store("users"),t=await e.query().where("byAge").greaterThan(30).toArray(),s=await e.query().where("byAge").lessThanOrEqual(30).toArray(),n=await e.query().where("byAge").between(25,35).toArray(),a=await e.query().where("byAge").between(25,35,{lowerOpen:!0,upperOpen:!0}).toArray();return{success:!0,message:"Comparison queries: greaterThan, lessThan, between",data:{over30:t.map(o=>({name:o.name,age:o.age})),under30:s.map(o=>({name:o.name,age:o.age})),between25And35:n.map(o=>({name:o.name,age:o.age})),between25And35Exclusive:a.map(o=>({name:o.name,age:o.age}))},code:`
+// Greater than (exclusive)
+const over30 = await store.query()
+  .where('byAge').greaterThan(30)
+  .toArray()
+
+// Less than or equal (inclusive)
+const under30 = await store.query()
+  .where('byAge').lessThanOrEqual(30)
+  .toArray()
+
+// Between (inclusive by default)
+const between = await store.query()
+  .where('byAge').between(25, 35)
+  .toArray()
+
+// With exclusivity options
+const betweenExclusive = await store.query()
+  .where('byAge').between(25, 35, { lowerOpen: true, upperOpen: true })
+  .toArray()
+`.trim()}}async function Ye(r){return{success:!0,message:"startsWith() - String prefix queries",data:{aEmails:(await r.store("users").query().where("byEmail").startsWith("a").toArray()).map(s=>({name:s.name,email:s.email}))},code:`
+// String prefix query
+const aEmails = await store.query()
+  .where('byEmail').startsWith('a')  // 'alice@...', 'adam@...', etc.
+  .toArray()
+
+// Uses IDBKeyRange.bound(prefix, prefix + '\\uffff')
+`.trim()}}async function Ze(r){return{success:!0,message:"anyOf() - Multiple value queries",data:{adminOrUser:(await r.store("users").query().where("byRole").anyOf(["admin","user"]).toArray()).map(s=>({name:s.name,role:s.role}))},code:`
+// Find records matching any of multiple values
+const adminOrUser = await store.query()
+  .where('byRole').anyOf(['admin', 'user'])
+  .toArray()
+
+// Executes parallel queries and merges results
+// Results are deduplicated by primary key
+`.trim()}}async function et(r){const e=r.store("users"),t=await e.query().filter(a=>a.email.endsWith("@example.com")).toArray(),s=await e.query().filter(a=>a.age>=30&&a.status==="active").toArray(),n=await e.query().filter(a=>/^[A-D]/.test(a.name)).toArray();return{success:!0,message:"filter() - Flexible post-cursor filtering",data:{gmailUsers:t.map(a=>a.email),activeAdults:s.map(a=>({name:a.name,age:a.age})),namePattern:n.map(a=>a.name)},code:`
+// Filter for conditions that can't use indexes
+const gmailUsers = await store.query()
+  .filter(u => u.email.endsWith('@gmail.com'))
+  .toArray()
+
+// Complex conditions
+const activeAdults = await store.query()
+  .filter(u => u.age >= 30 && u.status === 'active')
+  .toArray()
+
+// Regex matching
+const pattern = await store.query()
+  .filter(u => /^J.*n$/.test(u.name))
+  .toArray()
+`.trim()}}async function tt(r){return{success:!0,message:"Combining where() and filter() for optimal performance",data:{activeWithE:(await r.store("users").query().where("byStatus").equals("active").filter(s=>s.name.includes("a")).toArray()).map(s=>s.name)},code:`
+// Best practice: narrow with index first, then filter
+const results = await store.query()
+  .where('byStatus').equals('active')  // Fast: uses index
+  .filter(u => u.email.endsWith('@gmail.com'))  // Then: post-filter
+  .toArray()
+
+// This is more efficient than filtering all records
+`.trim()}}async function st(r){const e=r.store("users"),t=await e.query().where("byAge").greaterThanOrEqual(0).orderBy("ascending").toArray(),s=await e.query().where("byAge").greaterThanOrEqual(0).orderBy("descending").toArray(),n=await e.query().limit(2).offset(0).toArray(),a=await e.query().limit(2).offset(2).toArray();return{success:!0,message:"orderBy() and limit/offset pagination",data:{ascending:t.map(o=>({name:o.name,age:o.age})),descending:s.map(o=>({name:o.name,age:o.age})),page1:n.map(o=>o.name),page2:a.map(o=>o.name)},code:`
+// Ascending order (default)
+const ascending = await store.query()
+  .where('byAge').greaterThanOrEqual(0)
+  .orderBy('ascending')
+  .toArray()
+
+// Descending order
+const descending = await store.query()
+  .orderBy('descending')
+  .toArray()
+
+// Pagination
+const page1 = await store.query().limit(10).offset(0).toArray()
+const page2 = await store.query().limit(10).offset(10).toArray()
+`.trim()}}async function rt(r){const e=r.store("users"),t=await e.query().where("byStatus").equals("active").toArray(),s=await e.query().where("byStatus").equals("active").first(),n=await e.query().where("byStatus").equals("active").count(),a=await e.query().where("byStatus").equals("active").keys();return{success:!0,message:"Terminal operations: toArray, first, count, keys",data:{allCount:t.length,first:s?.name??"none",count:n,keys:a},code:`
+// Get all matching records
+const records = await query.toArray()
+
+// Get first match only (more efficient)
+const first = await query.first()
+
+// Count matches (without loading data)
+const count = await query.count()
+
+// Get keys only (more efficient than full records)
+const keys = await query.keys()
+
+// Memory-efficient iteration
+for await (const record of query.iterate()) {
+  processRecord(record)
+  if (done) break  // Early termination supported
+}
+`.trim()}}async function nt(r){const e=r.store("users"),t=[];for await(const n of e.query().where("byStatus").equals("active").iterate())t.push(n.name);let s;for await(const n of e.query().iterate())if(n.status==="active"){s=n.name;break}return{success:!0,message:"iterate() - Memory-efficient async generator",data:{iteratedNames:t,firstActive:s},code:`
+// Memory-efficient iteration
+for await (const user of store.query().iterate()) {
+  processUser(user)
+  if (done) break  // Clean early termination
+}
+
+// Only one record in memory at a time
+// Great for large datasets
+`.trim()}}async function at(r){const e=r.store("posts"),t=await e.query().where("byPublished").equals(!0).toArray(),s=await e.query().where("byPublished").equals(!1).toArray();return{success:!0,message:"Boolean queries - Automatic fallback to filter",data:{publishedPosts:t.map(n=>n.title),draftPosts:s.map(n=>n.title)},code:`
+// Boolean values are NOT valid IndexedDB keys
+// The library automatically handles this
+
+const published = await store.query()
+  .where('byPublished').equals(true)  // Works! Falls back to filter
+  .toArray()
+
+// This is equivalent to:
+const published = await store.query()
+  .filter(post => post.published === true)
+  .toArray()
+
+// For better performance, consider storing as 0/1 instead
+`.trim()}}async function ot(r){let e=0,t=0,s="";return await r.read(["users","posts"],async n=>{const a=await n.store("users").all(),o=await n.store("posts").all();e=a.length,t=o.length,s=a[0]?.name??"none"}),{success:!0,message:"db.read() - Consistent reads across stores",data:{userCount:e,postCount:t,firstUser:s},code:`
+// Read transaction - consistent view
+await db.read(['users', 'posts'], async (tx) => {
+  const users = await tx.store('users').all()
+  const posts = await tx.store('posts').all()
+  // Both reads see the same snapshot
+})
+
+// Single store reads can use store directly
+const user = await db.store('users').get('u1')
+`.trim()}}async function it(r){await r.store("posts").set([...X]);let e="",t="";return await r.write(["users","posts"],async s=>{const n=await s.store("users").resolve("u1");t=n.name;const a={id:"tx-post",title:"Transaction Demo Post",content:"Created in a transaction",authorId:n.id,published:!0,views:0,createdAt:Date.now()};await s.store("posts").set(a),e=a.id}),await r.store("posts").remove("tx-post"),{success:!0,message:"db.write() - Atomic multi-store modifications",data:{createdPostId:e,authorName:t},code:`
+// Write transaction - atomic modifications
+await db.write(['users', 'posts'], async (tx) => {
+  const user = await tx.store('users').resolve('u1')
+
+  await tx.store('posts').set({
+    id: crypto.randomUUID(),
+    title: 'New Post',
+    authorId: user.id,
+    // ...
+  })
+
+  // Transaction commits on success
+  // Aborts on any error (all changes rolled back)
+})
+`.trim()}}async function ct(r){return await r.write(["settings"],async e=>{await e.store("settings").set({id:"durability-test",key:"test",value:"relaxed",updatedAt:Date.now()})},{durability:"relaxed"}),await r.store("settings").remove("durability-test"),{success:!0,message:"Transaction durability options",data:{durabilityLevels:["default","strict","relaxed"]},code:`
+// Durability options control when transaction is considered complete
+
+// 'default' - OS/browser default behavior
+await db.write(['logs'], async (tx) => {
+  await tx.store('logs').set(entry)
+})
+
+// 'strict' - Wait for data to be flushed to disk
+await db.write(['critical'], async (tx) => {
+  await tx.store('critical').set(data)
+}, { durability: 'strict' })
+
+// 'relaxed' - May return before data is flushed (faster)
+await db.write(['logs'], async (tx) => {
+  await tx.store('logs').set(entry)
+}, { durability: 'relaxed' })
+`.trim()}}async function lt(r){let e="",t=[],s=!1;return await r.read(["users","posts"],n=>{e=n.getMode(),t=n.getStoreNames(),s=n.isActive()}),{success:!0,message:"Transaction accessor methods",data:{mode:e,storeNames:t,isActive:s},code:`
+await db.read(['users', 'posts'], async (tx) => {
+  tx.getMode()         // 'readonly' | 'readwrite'
+  tx.getStoreNames()   // ['users', 'posts']
+  tx.isActive()        // true (while in operation)
+  tx.isFinished()      // false (until complete/abort)
+})
+`.trim()}}async function ut(r){const e=await r.store("settings").count();let t=!1;try{await r.write(["settings"],async n=>{await n.store("settings").set({id:"abort-test",key:"abort",value:"should be rolled back",updatedAt:Date.now()}),n.abort()})}catch{t=!0}const s=await r.store("settings").count();return{success:!0,message:"Transaction abort - rolls back all changes",data:{beforeCount:e,afterCount:s,errorCaught:t,recordsAdded:s-e},code:`
+await db.write(['users'], async (tx) => {
+  await tx.store('users').set(user1)
+  await tx.store('users').set(user2)
+
+  if (someCondition) {
+    tx.abort()  // Roll back ALL changes
+  }
+})
+
+// Also aborts on any thrown error:
+await db.write(['users'], async (tx) => {
+  await tx.store('users').set(user)
+  throw new Error('Something went wrong')
+  // Transaction is automatically aborted
+})
+`.trim()}}async function dt(r){let e="";return await r.read(["users"],t=>{e=t.native.mode}),{success:!0,message:"Native IDBTransaction access",data:{nativeMode:e},code:`
+await db.write(['users'], async (tx) => {
+  // Access native IDBTransaction
+  const nativeTx = tx.native
+
+  // Use native APIs when needed
+  nativeTx.mode           // 'readonly' | 'readwrite'
+  nativeTx.objectStoreNames  // DOMStringList
+  nativeTx.db             // IDBDatabase
+})
+`.trim()}}async function mt(r){const e=r.store("users"),t=[];for await(const n of e.iterate())t.push(n.name);const s=[];for await(const n of e.iterate({direction:"previous"}))s.push(n.name);return{success:!0,message:"iterate() - Memory-efficient async generator",data:{names:t,reversedNames:s},code:`
+// Simple iteration
+for await (const user of store.iterate()) {
+  console.log(user.name)
+}
+
+// With options
+for await (const user of store.iterate({
+  direction: 'previous',  // Reverse order
+  query: IDBKeyRange.bound('a', 'm')  // Filter by key range
+})) {
+  console.log(user.name)
+}
+
+// Early termination is clean
+for await (const user of store.iterate()) {
+  if (found) break  // Resources properly cleaned up
+}
+`.trim()}}async function ht(r){const e=r.store("users"),t=[];for await(const s of e.iterateKeys())t.push(JSON.stringify(s));return{success:!0,message:"iterateKeys() - Efficient key-only iteration",data:{keys:t},code:`
+// Key-only iteration - more efficient than full records
+for await (const key of store.iterateKeys()) {
+  console.log(key)
+}
+
+// Use when you only need keys, not full records
+// Doesn't load record data = less memory, faster
+`.trim()}}async function pt(r){const e=r.store("users"),t=[];let s=await e.openCursor();for(;s;)t.push({key:s.getKey(),name:s.getValue().name}),s=await s.continue();return{success:!0,message:"openCursor() - Manual cursor control",data:{recordCount:t.length,records:t},code:`
+// Manual cursor for full control
+let cursor = await store.openCursor()
+
+while (cursor) {
+  const key = cursor.getKey()
+  const primaryKey = cursor.getPrimaryKey()
+  const value = cursor.getValue()
+  const direction = cursor.getDirection()
+
+  console.log(\`\${key}: \${value.name}\`)
+
+  cursor = await cursor.continue()
+}
+`.trim()}}async function yt(r){await r.store("users").set({id:"cursor-test-1",name:"Cursor Test User 1",email:"cursor1@test.com",age:99,status:"inactive",role:"guest",tags:["test"],createdAt:Date.now()}),await r.store("users").set({id:"cursor-test-2",name:"Cursor Test User 2",email:"cursor2@test.com",age:98,status:"inactive",role:"guest",tags:["test"],createdAt:Date.now()});let e=0,t=0;return await r.write(["users"],async s=>{let n=await s.store("users").openCursor();for(;n;){const a=n.getValue();a.id==="cursor-test-1"?(await n.update({...a,name:"Updated via Cursor"}),e++):a.id==="cursor-test-2"&&(await n.delete(),t++),n=await n.continue()}}),await r.store("users").remove("cursor-test-1"),{success:!0,message:"Cursor mutation - Update and delete during iteration",data:{updated:e,deleted:t},code:`
+// Use write transaction for cursor mutations
+await db.write(['users'], async (tx) => {
+  let cursor = await tx.store('users').openCursor()
+
+  while (cursor) {
+    const user = cursor.getValue()
+
+    if (user.status === 'inactive') {
+      // Delete during iteration
+      await cursor.delete()
+    } else if (user.needsUpdate) {
+      // Update during iteration
+      await cursor.update({ ...user, updatedAt: Date.now() })
+    }
+
+    cursor = await cursor.continue()
+  }
+})
+`.trim()}}async function gt(r){const e=r.store("users"),t=[];let s=await e.openCursor();s&&(t.push(s.getValue().name),s=await s.continue(),s&&t.push(s.getValue().name));const n=[];return s=await e.openCursor(),s&&(n.push(s.getValue().name),s=await s.advance(2),s&&n.push(`(after skip 2) ${s.getValue().name}`)),{success:!0,message:"Cursor navigation methods",data:{continued:t,advanced:n},code:`
+let cursor = await store.openCursor()
+
+// Continue to next record
+cursor = await cursor.continue()
+
+// Continue to specific key
+cursor = await cursor.continue('u5')
+
+// Skip N records
+cursor = await cursor.advance(5)
+
+// For index cursors: continue to specific primary key
+// cursor = await cursor.continuePrimaryKey(indexKey, primaryKey)
+`.trim()}}async function ft(r){const e=r.store("users"),t=[];for await(const n of e.iterate({direction:"next"}))t.push(n.name);const s=[];for await(const n of e.iterate({direction:"previous"}))s.push(n.name);return{success:!0,message:"Cursor directions",data:{forward:t,backward:s,directions:["next","nextunique","previous","previousunique"]},code:`
+// Direction options:
+// 'next'           - Ascending, include duplicates (default)
+// 'nextunique'     - Ascending, skip duplicates
+// 'previous'       - Descending, include duplicates
+// 'previousunique' - Descending, skip duplicates
+
+for await (const user of store.iterate({ direction: 'previous' })) {
+  console.log(user.name)  // Reverse order
+}
+`.trim()}}async function wt(r){const e=r.store("users"),t=[];let s=await e.openKeyCursor();for(;s;)t.push(JSON.stringify(s.getKey())),s=await s.continue();return{success:!0,message:"Key cursor - Efficient key-only access",data:{keys:t},code:`
+// Key cursor doesn't load record values
+// More efficient when you only need keys
+
+let keyCursor = await store.openKeyCursor()
+
+while (keyCursor) {
+  const key = keyCursor.getKey()
+  const primaryKey = keyCursor.getPrimaryKey()
+  const direction = keyCursor.getDirection()
+
+  console.log(key)
+
+  keyCursor = await keyCursor.continue()
+}
+`.trim()}}async function bt(r){const t=r.store("users").index("byStatus"),s=[];for await(const n of t.iterate({query:IDBKeyRange.only("active")}))s.push({indexKey:"active",primaryKey:n.id,name:n.name});return{success:!0,message:"Index cursors - Iterate through index",data:{activeUsers:s},code:`
+const statusIndex = store.index('byStatus')
+
+// Iterate through index
+for await (const user of statusIndex.iterate({
+  query: IDBKeyRange.only('active')
+})) {
+  console.log(user.name)
+}
+
+// Manual index cursor
+let cursor = await statusIndex.openCursor()
+while (cursor) {
+  // cursor.getKey() returns index key
+  // cursor.getPrimaryKey() returns primary key
+  // cursor.getValue() returns full record
+  cursor = await cursor.continue()
+}
+`.trim()}}const U=[];async function vt(r){U.length=0;const e=[],t=r.onChange(s=>{U.push({...s,timestamp:Date.now()})});return e.push(t),await r.store("settings").set({id:"event-test",key:"test",value:"trigger-change",updatedAt:Date.now()}),await r.store("settings").remove("event-test"),await new Promise(s=>setTimeout(s,50)),e.forEach(s=>s()),{success:!0,message:"db.onChange() - Database-level change events",data:{events:U.map(s=>({storeName:s.storeName,type:s.type,keys:s.keys,source:s.source}))},code:`
+// Subscribe to all changes across all stores
+const unsubscribe = db.onChange((event) => {
+  console.log(\`\${event.storeName}: \${event.type}\`, event.keys)
+
+  if (event.source === 'remote') {
+    // Change from another tab
+    refreshUI()
+  }
+})
+
+// Event structure:
+// {
+//   storeName: string,      // Store that changed
+//   type: 'set' | 'add' | 'remove' | 'clear',
+//   keys: ValidKey[],       // Affected keys
+//   source: 'local' | 'remote'  // Origin
+// }
+
+// Cleanup when done
+unsubscribe()
+`.trim()}}async function xt(r){U.length=0;const e=[],t=r.store("settings").onChange(s=>{U.push({...s,timestamp:Date.now()})});return e.push(t),await r.store("settings").set({id:"store-event-test",key:"test",value:"store-level",updatedAt:Date.now()}),await r.store("users").set({id:"no-trigger",name:"No Trigger",email:"no@trigger.com",age:0,status:"inactive",role:"guest",tags:[],createdAt:Date.now()}),await new Promise(s=>setTimeout(s,50)),await r.store("settings").remove("store-event-test"),await r.store("users").remove("no-trigger"),e.forEach(s=>s()),{success:!0,message:"store.onChange() - Store-level change events",data:{settingsEvents:U.length,events:U.map(s=>({type:s.type,keys:s.keys}))},code:`
+// Subscribe to specific store changes only
+const unsubscribe = db.store('users').onChange((event) => {
+  if (event.type === 'set') {
+    invalidateCache(event.keys)
+  }
+})
+
+// Only triggers for changes to this store
+// More efficient than database-level when targeting one store
+
+unsubscribe()
+`.trim()}}function Et(r){return{success:!0,message:"Cross-tab synchronization via BroadcastChannel",data:{crossTabSyncEnabled:!0,howToTest:"Open this page in another tab and make changes"},code:`
+// Cross-tab sync is enabled by default
+const db = createDatabase<AppSchema>({
+  name: 'myApp',
+  version: 1,
+  stores: { users: {} },
+  crossTabSync: true  // Default: true
+})
+
+// Changes in Tab 1
+await db.store('users').set({ id: 'u1', name: 'Alice' })
+
+// Tab 2 receives change event with source: 'remote'
+db.onChange((event) => {
+  if (event.source === 'remote') {
+    console.log('Another tab made changes:', event)
+    refreshUI()
+  }
+})
+
+// Disable if not needed (saves resources)
+const db = createDatabase({
+  // ...
+  crossTabSync: false
+})
+`.trim()}}function Ct(r){const e=[];return r.onError(s=>{e.push(s.message)})(),{success:!0,message:"db.onError() - Error event handling",data:{subscribedToErrors:!0,note:"Errors are captured for logging/analytics"},code:`
+// Subscribe to error events
+const unsubscribe = db.onError((error) => {
+  console.error('Database error:', error)
+  reportToAnalytics(error)
+})
+
+// Useful for:
+// - Centralized error logging
+// - Analytics
+// - User notifications
+// - Error recovery strategies
+
+unsubscribe()
+`.trim()}}function At(r){let e=!1;return r.onVersionChange(()=>{e=!0})(),{success:!0,message:"db.onVersionChange() - Handle version upgrades",data:{subscribedToVersionChange:!0,versionChangeReceived:e},code:`
+// Triggered when another tab wants to upgrade the database
+const unsubscribe = db.onVersionChange((event) => {
+  console.log(\`Upgrade requested: v\${event.oldVersion} -> v\${event.newVersion}\`)
+
+  // Typically close connection to allow upgrade
+  showNotification('Updating app, please wait...')
+  db.close()
+})
+
+// Important for:
+// - Graceful handling of database upgrades
+// - User communication during upgrades
+// - Preventing upgrade blocking
+
+unsubscribe()
+`.trim()}}function St(r){let e=!1;return r.onClose(()=>{e=!0})(),{success:!0,message:"db.onClose() - Handle connection close",data:{subscribedToClose:!0,closeReceived:e},code:`
+// Triggered when database connection closes
+const unsubscribe = db.onClose(() => {
+  console.log('Database connection closed')
+
+  // Reconnect or show offline message
+  showOfflineMessage()
+})
+
+// Useful for:
+// - Cleanup resources
+// - Show offline indicators
+// - Reconnection logic
+
+unsubscribe()
+`.trim()}}function kt(){return{success:!0,message:"Event hooks in database options",data:{availableHooks:["onChange","onError","onBlocked","onVersionChange","onClose"]},code:`
+// Set up event handlers at creation time
+const db = createDatabase<AppSchema>({
+  name: 'myApp',
+  version: 1,
+  stores: { users: {} },
+
+  // Event hooks
+  onChange: (event) => {
+    console.log('Change:', event)
+    syncToUI()
+  },
+
+  onError: (error) => {
+    console.error('Error:', error)
+    reportError(error)
+  },
+
+  onBlocked: () => {
+    console.warn('Upgrade blocked by other tabs')
+    showCloseTabsMessage()
+  },
+
+  onVersionChange: (event) => {
+    console.log('Version change:', event)
+    prepareForUpgrade()
+  },
+
+  onClose: () => {
+    console.log('Connection closed')
+    showOfflineStatus()
+  }
+})
+`.trim()}}async function Tt(r){const e=r.store("users");let t=null;try{await e.resolve("nonexistent-user")}catch(s){s instanceof P&&(t={name:s.name,code:s.code,key:JSON.stringify(s.key),storeName:s.storeName})}return{success:!0,message:"NotFoundError - Thrown by resolve() for missing records",data:{errorDetails:t},code:`
+try {
+  const user = await store.resolve('nonexistent')
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.log(\`Key: \${error.key}\`)
+    console.log(\`Store: \${error.storeName}\`)
+    console.log(\`Code: \${error.code}\`)  // 'NOT_FOUND'
+  }
+}
+
+// NotFoundError properties:
+// - code: 'NOT_FOUND'
+// - key: ValidKey - The missing key
+// - storeName: string - The store name
+`.trim()}}async function Nt(r){const e=r.store("users");let t=null;await e.set({id:"constraint-test",name:"Constraint Test",email:"constraint@test.com",age:30,status:"active",role:"user",tags:[],createdAt:Date.now()});try{await e.add({id:"constraint-test",name:"Duplicate",email:"dupe@test.com",age:25,status:"active",role:"user",tags:[],createdAt:Date.now()})}catch(s){s instanceof Y&&(t={name:s.name,code:s.code,key:JSON.stringify(s.key)})}return await e.remove("constraint-test"),{success:!0,message:"ConstraintError - Thrown by add() for duplicate keys",data:{errorDetails:t},code:`
+try {
+  await store.add({ id: 'existing', name: 'Duplicate' })
+} catch (error) {
+  if (error instanceof ConstraintError) {
+    console.log('Key already exists:', error.key)
+
+    // Common pattern: fallback to set() for upsert
+    await store.set({ id: 'existing', name: 'Updated' })
+  }
+}
+
+// ConstraintError properties:
+// - code: 'CONSTRAINT_ERROR'
+// - key: ValidKey - The conflicting key
+// - storeName: string - The store name
+`.trim()}}function qt(){return{success:!0,message:"Error codes for different failure modes",data:{errorCodes:["NOT_FOUND","CONSTRAINT_ERROR","QUOTA_EXCEEDED","TRANSACTION_ABORTED","TRANSACTION_INACTIVE","OPEN_FAILED","UPGRADE_FAILED","UPGRADE_BLOCKED","DATA_ERROR","READ_ONLY","VERSION_ERROR","INVALID_STATE","TIMEOUT","UNKNOWN_ERROR"]},code:`
+// All database errors have a code property
+type DatabaseErrorCode =
+  | 'OPEN_FAILED'           // Database failed to open
+  | 'UPGRADE_FAILED'        // Migration or store creation failed
+  | 'UPGRADE_BLOCKED'       // Other connections prevent upgrade
+  | 'TRANSACTION_ABORTED'   // Transaction was aborted
+  | 'TRANSACTION_INACTIVE'  // Operation on inactive transaction
+  | 'CONSTRAINT_ERROR'      // Key/uniqueness constraint violated
+  | 'QUOTA_EXCEEDED'        // Storage quota exceeded
+  | 'NOT_FOUND'             // Record not found (resolve())
+  | 'DATA_ERROR'            // Invalid data format
+  | 'READ_ONLY'             // Write attempted on readonly transaction
+  | 'VERSION_ERROR'         // Version conflict
+  | 'INVALID_STATE'         // Database in invalid state
+  | 'TIMEOUT'               // Operation timed out
+  | 'UNKNOWN_ERROR'         // Unrecognized error
+`.trim()}}async function Dt(r){const e=r.store("users");let t=!1,s=!1,n=!1,a=!1;try{await e.resolve("nonexistent")}catch(o){t=Z(o),n=Ae(o),a=Se(o,"NOT_FOUND")}await e.set({id:"guard-test",name:"Guard Test",email:"guard@test.com",age:30,status:"active",role:"user",tags:[],createdAt:Date.now()});try{await e.add({id:"guard-test",name:"Duplicate",email:"dupe@test.com",age:25,status:"active",role:"user",tags:[],createdAt:Date.now()})}catch(o){s=ee(o)}return await e.remove("guard-test"),{success:!0,message:"Type guards for safe error handling",data:{isNotFoundError:t,isConstraintError:s,isDatabaseError:n,hasErrorCode:a},code:`
+import {
+  isDatabaseError,
+  isNotFoundError,
+  isConstraintError,
+  isQuotaExceededError,
+  isTransactionError,
+  hasErrorCode
+} from '@mikesaintsg/indexeddb'
+
+try {
+  await store.resolve('u1')
+} catch (error) {
+  if (isNotFoundError(error)) {
+    // error is typed as NotFoundError
+    console.log(error.key, error.storeName)
+  } else if (isConstraintError(error)) {
+    // error is typed as ConstraintError
+    console.log(error.key)
+  } else if (isDatabaseError(error)) {
+    // error is typed as DatabaseError
+    console.log(error.code, error.message)
+  }
+
+  // Check for specific error code
+  if (hasErrorCode(error, 'QUOTA_EXCEEDED')) {
+    showStorageFullMessage()
+  }
+}
+`.trim()}}function It(){return{success:!0,message:"Error class hierarchy",data:{hierarchy:["DatabaseError (base)","  └─ NotFoundError","  └─ ConstraintError","  └─ QuotaExceededError","  └─ TransactionError","  └─ UpgradeError","  └─ OpenError","  └─ DataError","  └─ ReadOnlyError","  └─ VersionError","  └─ InvalidStateError","  └─ TimeoutError"]},code:`
+// Error class hierarchy:
+// DatabaseError (base) — all database errors
+//   └─ NotFoundError — resolve() when record missing
+//   └─ ConstraintError — add() when key exists
+//   └─ QuotaExceededError — storage quota exceeded
+//   └─ TransactionError — transaction aborted or inactive
+//   └─ UpgradeError — database upgrade failed or blocked
+//   └─ OpenError — database failed to open
+//   └─ DataError — invalid data format
+//   └─ ReadOnlyError — write on readonly transaction
+//   └─ VersionError — version conflict
+//   └─ InvalidStateError — invalid database state
+//   └─ TimeoutError — operation timed out
+
+// All errors extend DatabaseError
+if (error instanceof DatabaseError) {
+  console.log(error.code)     // Error code
+  console.log(error.message)  // Error message
+  console.log(error.cause)    // Original error (if wrapped)
+}
+`.trim()}}async function Ot(r){const e=r.store("users"),t=[],s=await e.get("nonexistent");t.push(`get() returns: ${s===void 0?"undefined":"value"}`);try{await e.resolve("nonexistent")}catch(n){Z(n)&&t.push("resolve() throws NotFoundError")}await e.set({id:"error-demo",name:"Demo",email:"demo@test.com",age:30,status:"active",role:"user",tags:[],createdAt:Date.now()});try{await e.add({id:"error-demo",name:"Duplicate",email:"dupe@test.com",age:25,status:"active",role:"user",tags:[],createdAt:Date.now()})}catch(n){ee(n)&&t.push("add() throws ConstraintError")}return await e.remove("error-demo"),{success:!0,message:"Comprehensive error handling patterns",data:{results:t},code:`
+// Comprehensive error handling pattern
+async function safeOperation() {
+  try {
+    const user = await store.resolve('u1')
+    await store.add(newRecord)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      // Handle missing record
+      return createDefault()
+    }
+
+    if (isConstraintError(error)) {
+      // Handle duplicate key
+      return store.set(record)  // Fallback to upsert
+    }
+
+    if (isQuotaExceededError(error)) {
+      // Handle storage full
+      await clearOldData()
+      return retry()
+    }
+
+    if (isTransactionError(error)) {
+      // Handle transaction failure
+      await retry()
+    }
+
+    // Unknown error - rethrow
+    throw error
+  }
+}
+`.trim()}}const F=["Alice","Bob","Carol","David","Emma","Frank","Grace","Henry","Ivy","Jack","Kate","Leo","Maya","Noah","Olivia","Peter","Quinn","Rose","Sam","Tara"],_=["Anderson","Brown","Clark","Davis","Evans","Foster","Garcia","Harris","Ivanov","Jones","Kim","Lee","Miller","Nelson","Ortiz","Park","Quinn","Roberts","Smith","Taylor"],V=["gmail.com","outlook.com","yahoo.com","proton.me","icloud.com"],ae=["admin","user","user","user","guest"],oe=["active","active","active","inactive"],ie=["developer","designer","manager","marketing","sales","support","hr","finance","ops","engineering"];function pe(r){const e=F[Math.floor(Math.random()*F.length)]??"User",t=_[Math.floor(Math.random()*_.length)]??"Unknown",s=V[Math.floor(Math.random()*V.length)]??"example.com",n=ae[Math.floor(Math.random()*ae.length)]??"user",a=oe[Math.floor(Math.random()*oe.length)]??"active",o=Math.floor(Math.random()*4),i=[];for(let c=0;c<o;c++){const l=ie[Math.floor(Math.random()*ie.length)];l&&!i.includes(l)&&i.push(l)}return{id:`bulk-${r}-${Date.now()}`,name:`${e} ${t}`,email:`${e.toLowerCase()}.${t.toLowerCase()}${r}@${s}`,age:18+Math.floor(Math.random()*50),status:a,role:n,tags:i,createdAt:Date.now()-Math.floor(Math.random()*365*24*60*60*1e3)}}async function Rt(r){await r.store("users").set([...J]),await r.store("posts").set([...X]),await r.store("settings").set([...ce]);const e=[];for(let t=0;t<100;t++)e.push(pe(t));await r.store("users").set(e)}function Pt(){let r;return{html:`
+			<div class="demo-app bulk-performance">
+				<h4>⚡ Bulk Performance Demo</h4>
+				<p class="demo-desc">Insert and query <strong>10,000+ records</strong> with real-time performance metrics. Shows the power of IndexedDB for large datasets.</p>
+
+				<div class="performance-panel">
+					<div class="perf-controls">
+						<div class="perf-row">
+							<label>Records to insert:</label>
+							<select id="bulk-count" class="demo-select">
+								<option value="1000">1,000</option>
+								<option value="5000">5,000</option>
+								<option value="10000" selected>10,000</option>
+								<option value="25000">25,000</option>
+								<option value="50000">50,000</option>
+							</select>
+							<button id="bulk-insert-btn" class="btn primary">🚀 Bulk Insert</button>
+							<button id="bulk-clear-btn" class="btn danger">🗑️ Clear All</button>
+						</div>
+					</div>
+
+					<div class="perf-stats">
+						<div class="perf-stat-card">
+							<span class="perf-label">Total Records</span>
+							<span class="perf-value" id="total-records">0</span>
+						</div>
+						<div class="perf-stat-card">
+							<span class="perf-label">Insert Time</span>
+							<span class="perf-value" id="insert-time">—</span>
+						</div>
+						<div class="perf-stat-card">
+							<span class="perf-label">Records/sec</span>
+							<span class="perf-value" id="insert-rate">—</span>
+						</div>
+						<div class="perf-stat-card">
+							<span class="perf-label">Query Time</span>
+							<span class="perf-value" id="query-time">—</span>
+						</div>
+					</div>
+
+					<div class="perf-progress" id="perf-progress" style="display: none;">
+						<div class="progress-bar">
+							<div class="progress-fill" id="perf-progress-fill" style="width: 0%"></div>
+						</div>
+						<span id="perf-progress-text">Preparing...</span>
+					</div>
+				</div>
+
+				<div class="query-section">
+					<h5>🔍 Query Performance</h5>
+					<div class="query-row">
+						<select id="query-type" class="demo-select">
+							<option value="all">all() - Get all records</option>
+							<option value="count">count() - Count records</option>
+							<option value="status">where(status).equals('active')</option>
+							<option value="age-range">where(age).between(25, 40)</option>
+							<option value="role">where(role).equals('admin')</option>
+							<option value="filter">filter(age > 30 AND role='user')</option>
+						</select>
+						<button id="run-query-btn" class="btn primary">▶ Run Query</button>
+					</div>
+					<div class="query-results" id="query-results">
+						<p class="placeholder">Select a query and click Run</p>
+					</div>
+				</div>
+
+				<div class="demo-log" id="bulk-log"></div>
+			</div>
+		`,init:async(e,t)=>{const s=t.store("users"),n=e.querySelector("#total-records"),a=e.querySelector("#insert-time"),o=e.querySelector("#insert-rate"),i=e.querySelector("#query-time"),c=e.querySelector("#perf-progress"),l=e.querySelector("#perf-progress-fill"),u=e.querySelector("#perf-progress-text"),m=e.querySelector("#bulk-count"),d=e.querySelector("#bulk-insert-btn"),p=e.querySelector("#bulk-clear-btn"),g=e.querySelector("#query-type"),v=e.querySelector("#run-query-btn"),C=e.querySelector("#query-results"),A=e.querySelector("#bulk-log");function y(f,x="info"){const S=document.createElement("div");S.className=`log-entry ${x}`,S.textContent=`${new Date().toLocaleTimeString()} - ${f}`,A.insertBefore(S,A.firstChild),A.children.length>8&&A.lastChild&&A.removeChild(A.lastChild)}async function w(){const f=await s.count();n.textContent=f.toLocaleString()}d.onclick=()=>{const f=parseInt(m.value,10);d.disabled=!0,p.disabled=!0,c.style.display="block",l.style.width="0%",u.textContent=`Generating ${f.toLocaleString()} records...`,y(`Starting bulk insert of ${f.toLocaleString()} records...`,"info"),(async()=>{try{const S=[];for(let E=0;E<f;E+=1e3){const R=[],H=Math.min(E+1e3,f);for(let G=E;G<H;G++)R.push(pe(G));S.push(R)}u.textContent="Inserting into IndexedDB...";const q=performance.now();for(let E=0;E<S.length;E++){const R=S[E];if(R){await s.set(R);const H=Math.round((E+1)/S.length*100);l.style.width=`${H}%`,u.textContent=`Inserted ${((E+1)*1e3).toLocaleString()} of ${f.toLocaleString()}...`}}const D=performance.now()-q,O=Math.round(f/(D/1e3));a.textContent=`${D.toFixed(0)}ms`,o.textContent=O.toLocaleString(),y(`✅ Inserted ${f.toLocaleString()} records in ${D.toFixed(0)}ms (${O.toLocaleString()}/sec)`,"success"),await w(),c.style.display="none"}catch(x){y(`Error: ${x instanceof Error?x.message:"Unknown"}`,"error"),c.style.display="none"}finally{d.disabled=!1,p.disabled=!1}})()},p.onclick=()=>{(async()=>{try{const f=await s.count();await s.clear(),y(`Cleared ${f.toLocaleString()} records`,"info"),y("Restoring sample data for other demos...","info"),await Rt(t),y("Restored 100+ sample records","success"),await w(),a.textContent="—",o.textContent="—",i.textContent="—"}catch(f){y(`Error during clear: ${f instanceof Error?f.message:"Unknown"}`,"error")}})()},v.onclick=()=>{const f=g.value;v.disabled=!0,(async()=>{try{const x=performance.now();let S,q=0,D="";switch(f){case"all":{const E=await s.all();q=E.length,S=E.slice(0,5),D="await store.all()";break}case"count":{q=await s.count(),S=q,D="await store.count()";break}case"status":{const E=await s.query().where("byStatus").equals("active").toArray();q=E.length,S=E.slice(0,5),D="await store.query().where('byStatus').equals('active').toArray()";break}case"age-range":{const E=await s.query().where("byAge").between(25,40).toArray();q=E.length,S=E.slice(0,5),D="await store.query().where('byAge').between(25, 40).toArray()";break}case"role":{const E=await s.query().where("byRole").equals("admin").toArray();q=E.length,S=E.slice(0,5),D="await store.query().where('byRole').equals('admin').toArray()";break}case"filter":{const E=await s.query().filter(R=>R.age>30&&R.role==="user").toArray();q=E.length,S=E.slice(0,5),D="await store.query().filter(u => u.age > 30 && u.role === 'user').toArray()";break}}const O=performance.now()-x;i.textContent=`${O.toFixed(1)}ms`,C.innerHTML=`
+							<div class="query-result-box">
+								<div class="query-meta">
+									<span class="query-count">Found: <strong>${q.toLocaleString()}</strong> records</span>
+									<span class="query-elapsed">Time: <strong>${O.toFixed(1)}ms</strong></span>
+								</div>
+								<div class="query-code-block">
+									<code class="syntax-highlight">${D}</code>
+								</div>
+								<div class="query-preview">
+									<strong>Preview (first 5):</strong>
+									<pre>${JSON.stringify(S,null,2)}</pre>
+								</div>
+							</div>
+						`,y(`Query returned ${q.toLocaleString()} records in ${O.toFixed(1)}ms`,"success")}catch(x){y(`Query error: ${x instanceof Error?x.message:"Unknown"}`,"error")}finally{v.disabled=!1}})()},r=s.onChange(()=>{w()}),await w(),y("Bulk Performance Demo ready! Try inserting 10,000+ records.","info")},cleanup:()=>{r?.()}}}function $t(){return{html:`
+			<div class="demo-app user-search">
+				<h4>🔍 User Search</h4>
+				<p class="demo-desc">Search and filter users with <code>where()</code>, <code>filter()</code>, and <code>orderBy()</code></p>
+
+				<div class="demo-filters">
+					<input type="text" id="search-name" placeholder="Search by name..." class="demo-input" />
+					<select id="filter-status" class="demo-select">
+						<option value="">All Statuses</option>
+						<option value="active">Active</option>
+						<option value="inactive">Inactive</option>
+					</select>
+					<select id="filter-role" class="demo-select">
+						<option value="">All Roles</option>
+						<option value="admin">Admin</option>
+						<option value="user">User</option>
+						<option value="guest">Guest</option>
+					</select>
+				</div>
+
+				<div class="demo-stats">
+					<span class="stat">Results: <strong id="search-count">0</strong></span>
+					<span class="stat">Query time: <strong id="search-time">0</strong>ms</span>
+				</div>
+
+				<div class="query-display" id="query-display">
+					<strong>Query:</strong> <code id="query-code">store.all()</code>
+				</div>
+
+				<div class="demo-list" id="search-results">
+					<p class="placeholder">Enter search criteria above...</p>
+				</div>
+			</div>
+		`,init:(r,e)=>{const t=e.store("users"),s=r.querySelector("#search-results"),n=r.querySelector("#search-count"),a=r.querySelector("#search-time"),o=r.querySelector("#query-code"),i=r.querySelector("#search-name"),c=r.querySelector("#filter-status"),l=r.querySelector("#filter-role");async function u(){const p=i.value.toLowerCase().trim(),g=c.value,v=l.value,C=performance.now();let A=t.query();const y=["store.query()"];g&&(A=A.where("byStatus").equals(g),y.push(`.where('byStatus').equals('${g}')`)),p&&(A=A.filter(x=>x.name.toLowerCase().includes(p)),y.push(`.filter(u => u.name.includes('${p}'))`)),v&&(A=A.filter(x=>x.role===v),y.push(`.filter(u => u.role === '${v}')`)),y.push(".toArray()");const w=await A.toArray(),f=Math.round(performance.now()-C);if(n.textContent=String(w.length),a.textContent=String(f),o.textContent=y.join(`
+  `),w.length===0){s.innerHTML='<p class="placeholder">No users match your criteria</p>';return}s.innerHTML=w.map(x=>`
+					<div class="list-item">
+						<div class="item-info">
+							<strong>${x.name}</strong>
+							<span class="item-meta">${x.email} • Age ${x.age} • ${x.status} • ${x.role}</span>
+						</div>
+					</div>
+				`).join("")}let m;function d(){clearTimeout(m),m=setTimeout(()=>{u()},150)}i.oninput=d,c.onchange=d,l.onchange=d,u()}}}function Ut(){return{html:`
+			<div class="demo-app shopping-cart">
+				<h4>🛒 Shopping Cart</h4>
+				<p class="demo-desc">Atomic checkout with <code>write()</code> transaction - all operations succeed or all fail</p>
+
+				<div class="cart-layout">
+					<div class="cart-products">
+						<h5>Products</h5>
+						<div class="product-list">
+							<div class="product-item" data-id="prod1">
+								<span class="product-name">📱 Smartphone</span>
+								<span class="product-price">$599</span>
+								<button class="btn small add-to-cart" data-id="prod1" data-name="Smartphone" data-price="599">Add</button>
+							</div>
+							<div class="product-item" data-id="prod2">
+								<span class="product-name">💻 Laptop</span>
+								<span class="product-price">$1299</span>
+								<button class="btn small add-to-cart" data-id="prod2" data-name="Laptop" data-price="1299">Add</button>
+							</div>
+							<div class="product-item" data-id="prod3">
+								<span class="product-name">🎧 Headphones</span>
+								<span class="product-price">$199</span>
+								<button class="btn small add-to-cart" data-id="prod3" data-name="Headphones" data-price="199">Add</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="cart-summary">
+						<h5>Cart</h5>
+						<div id="cart-items" class="cart-items">
+							<p class="placeholder">Cart is empty</p>
+						</div>
+						<div class="cart-total">
+							Total: <strong>$<span id="cart-total">0</span></strong>
+						</div>
+						<button id="checkout-btn" class="btn primary" disabled>✅ Checkout (Atomic)</button>
+						<button id="checkout-fail-btn" class="btn danger" disabled>❌ Simulate Failure</button>
+					</div>
+				</div>
+
+				<div class="demo-log" id="cart-log"></div>
+			</div>
+		`,init:(r,e)=>{const t=r.querySelector("#cart-items"),s=r.querySelector("#cart-total"),n=r.querySelector("#cart-log"),a=r.querySelector("#checkout-btn"),o=r.querySelector("#checkout-fail-btn"),i=new Map;function c(u,m="info"){const d=document.createElement("div");d.className=`log-entry ${m}`,d.textContent=`${new Date().toLocaleTimeString()} - ${u}`,n.insertBefore(d,n.firstChild),n.children.length>8&&n.lastChild&&n.removeChild(n.lastChild)}function l(){const u=Array.from(i.values()),m=u.reduce((d,p)=>d+p.price*p.quantity,0);if(s.textContent=String(m),a.disabled=u.length===0,o.disabled=u.length===0,u.length===0){t.innerHTML='<p class="placeholder">Cart is empty</p>';return}t.innerHTML=u.map(d=>`
+					<div class="cart-item">
+						<span>${d.name} x${d.quantity}</span>
+						<span>$${d.price*d.quantity}</span>
+						<button class="btn small danger remove-item" data-id="${d.id}">×</button>
+					</div>
+				`).join(""),t.querySelectorAll(".remove-item").forEach(d=>{const p=d;p.onclick=()=>{const g=p.dataset.id??"",v=i.get(g);v&&v.quantity>1?i.set(g,{...v,quantity:v.quantity-1}):i.delete(g),l(),c(`Removed ${v?.name??"item"} from cart`)}})}r.querySelectorAll(".add-to-cart").forEach(u=>{const m=u;m.onclick=()=>{const d=m.dataset.id??"",p=m.dataset.name??"",g=parseInt(m.dataset.price??"0",10),v=i.get(d);v?i.set(d,{...v,quantity:v.quantity+1}):i.set(d,{id:d,name:p,price:g,quantity:1}),l(),c(`Added ${p} to cart`)}}),a.onclick=()=>{c("Starting atomic transaction...","info"),e.write(["settings"],async u=>{const m=u.store("settings"),d=Array.from(i.values()),p=`order-${Date.now()}`,g={id:p,key:"lastOrder",value:JSON.stringify({items:d.map(v=>({name:v.name,qty:v.quantity})),total:d.reduce((v,C)=>v+C.price*C.quantity,0)}),updatedAt:Date.now()};await m.set(g),c(`TX: Created order ${p}`,"info")}).then(()=>{c("✅ Transaction committed!","success"),i.clear(),l()}).catch(u=>{const m=u instanceof Error?u.message:"Unknown error";c(`❌ Transaction failed: ${m}`,"error")})},o.onclick=()=>{c("Starting transaction with failure...","info"),e.write(["settings"],async u=>{const m=u.store("settings"),d={id:"temp-checkout",key:"checkoutInProgress",value:"true",updatedAt:Date.now()};await m.set(d),c("TX: First operation succeeded","info"),c("TX: Aborting...","error"),u.abort()}).catch(()=>{c("❌ Transaction aborted! All changes rolled back.","error")})},l(),c("Shopping Cart ready!","info")}}}function Mt(){let r;return{html:`
+			<div class="demo-app cross-tab-sync featured-demo">
+				<div class="featured-banner">
+					<span class="featured-icon">🌐</span>
+					<span class="featured-text">REAL-TIME CROSS-TAB SYNC</span>
+				</div>
+
+				<h4>📡 Cross-Tab Synchronization Demo</h4>
+				<p class="demo-desc">
+					<strong>The most powerful browser storage feature!</strong> Changes made in one tab are <strong>instantly synchronized</strong>
+					to all other open tabs via <code>BroadcastChannel</code>. Try it now:
+				</p>
+
+				<div class="cross-tab-instruction">
+					<div class="instruction-step">
+						<span class="step-number">1</span>
+						<span class="step-text">Open this page in <strong>2+ browser tabs</strong></span>
+						<button id="open-new-tab" class="btn small">🔗 Open New Tab</button>
+					</div>
+					<div class="instruction-step">
+						<span class="step-number">2</span>
+						<span class="step-text">Click a button below in <strong>this tab</strong></span>
+					</div>
+					<div class="instruction-step">
+						<span class="step-number">3</span>
+						<span class="step-text">Watch the event appear in the <strong>other tab</strong> instantly!</span>
+					</div>
+				</div>
+
+				<div class="sync-controls">
+					<button id="sync-add-btn" class="btn primary large-btn">➕ Add User (triggers cross-tab event)</button>
+					<button id="sync-update-btn" class="btn large-btn">✏️ Update Random User</button>
+					<button id="sync-delete-btn" class="btn danger large-btn">🗑️ Delete Random User</button>
+				</div>
+
+				<div class="sync-stats">
+					<div class="sync-stat-card local">
+						<span class="sync-stat-label">Local Events</span>
+						<span class="sync-stat-value" id="local-event-count">0</span>
+						<span class="sync-stat-desc">Changes made in this tab</span>
+					</div>
+					<div class="sync-stat-card remote">
+						<span class="sync-stat-label">📡 Remote Events</span>
+						<span class="sync-stat-value" id="remote-event-count">0</span>
+						<span class="sync-stat-desc">Changes from other tabs</span>
+					</div>
+					<div class="sync-stat-card total">
+						<span class="sync-stat-label">Total Events</span>
+						<span class="sync-stat-value" id="total-event-count">0</span>
+						<span class="sync-stat-desc">All synchronized changes</span>
+					</div>
+				</div>
+
+				<h5>📜 Live Event Feed</h5>
+				<div class="event-feed enhanced-feed" id="sync-event-feed">
+					<p class="placeholder">Make a change or wait for events from other tabs...</p>
+				</div>
+
+				<div class="code-example-box">
+					<h5>💻 How It Works</h5>
+					<pre class="syntax-code"><code><span class="keyword">const</span> db = <span class="function">createDatabase</span>({
+  name: <span class="string">'myApp'</span>,
+  version: <span class="number">1</span>,
+  stores: { users: {} }
+})
+
+<span class="comment">// Subscribe to ALL changes (local + remote)</span>
+db.<span class="function">onChange</span>((event) =&gt; {
+  <span class="keyword">if</span> (event.source === <span class="string">'remote'</span>) {
+    <span class="comment">// This change came from another tab!</span>
+    console.<span class="function">log</span>(<span class="string">'📡 Cross-tab:'</span>, event.type, event.keys)
+  }
+})</code></pre>
+				</div>
+
+				<div class="demo-log" id="sync-log"></div>
+			</div>
+		`,init:(e,t)=>{const s=e.querySelector("#sync-event-feed"),n=e.querySelector("#local-event-count"),a=e.querySelector("#remote-event-count"),o=e.querySelector("#total-event-count"),i=e.querySelector("#sync-add-btn"),c=e.querySelector("#sync-update-btn"),l=e.querySelector("#sync-delete-btn"),u=e.querySelector("#open-new-tab"),m=e.querySelector("#sync-log"),d=t.store("users");let p=0,g=0,v=!0;function C(y,w="info"){const f=document.createElement("div");f.className=`log-entry ${w}`,f.textContent=`${new Date().toLocaleTimeString()} - ${y}`,m.insertBefore(f,m.firstChild),m.children.length>6&&m.lastChild&&m.removeChild(m.lastChild)}function A(y){const w=y.source==="remote";w?(g++,a.textContent=String(g),a.parentElement?.classList.add("flash"),setTimeout(()=>a.parentElement?.classList.remove("flash"),500)):(p++,n.textContent=String(p)),o.textContent=String(p+g),v&&(s.innerHTML="",v=!1);const f=document.createElement("div");f.className=`event-entry enhanced ${w?"remote-event":"local-event"} event-${y.type}`;const x=w?'<span class="source-badge remote">📡 FROM OTHER TAB</span>':'<span class="source-badge local">🏠 This Tab</span>',q={set:'<span class="type-badge set">SET</span>',add:'<span class="type-badge add">ADD</span>',remove:'<span class="type-badge remove">DELETE</span>'}[y.type]??`<span class="type-badge">${y.type.toUpperCase()}</span>`;for(f.innerHTML=`
+					<div class="event-header">
+						${x}
+						${q}
+						<span class="event-time">${new Date().toLocaleTimeString()}</span>
+					</div>
+					<div class="event-details">
+						<span class="event-store">Store: <strong>${y.storeName}</strong></span>
+						<span class="event-keys">Keys: <code>${JSON.stringify(y.keys)}</code></span>
+					</div>
+				`,f.classList.add("slide-in"),s.insertBefore(f,s.firstChild);s.children.length>15&&s.lastChild;)s.removeChild(s.lastChild);w&&C(`📡 CROSS-TAB: ${y.type} on ${y.storeName}`,"success")}r=t.onChange(y=>{A(y)}),u.onclick=()=>{window.open(window.location.href,"_blank"),C("Opened new tab - try making changes there!","info")},i.onclick=()=>{const y=F[Math.floor(Math.random()*F.length)]??"User",w=_[Math.floor(Math.random()*_.length)]??"Test",f=V[Math.floor(Math.random()*V.length)]??"example.com",x=`${y} ${w}`,S={id:`sync-${Date.now()}`,name:x,email:`${y.toLowerCase()}.${w.toLowerCase()}@${f}`,age:20+Math.floor(Math.random()*40),status:"active",role:"user",tags:[],createdAt:Date.now()};d.set(S).then(()=>{C(`Added "${x}" - check other tabs!`,"success")}).catch(()=>{})},c.onclick=()=>{d.all().then(async y=>{if(y.length===0){C("No users to update. Add some first!","error");return}const w=y[Math.floor(Math.random()*y.length)];if(w){const f={...w,age:w.age+1};await d.set(f),C(`Updated "${w.name}" age to ${f.age}`,"success")}}).catch(()=>{})},l.onclick=()=>{d.all().then(async y=>{if(y.length===0){C("No users to delete. Add some first!","error");return}const w=y[Math.floor(Math.random()*y.length)];w&&(await d.remove(w.id),C(`Deleted "${w.name}"`,"success"))}).catch(()=>{})},C("Cross-Tab Sync Demo ready! Open another tab to test.","info")},cleanup:()=>{r?.()}}}function Bt(){return{html:`
+			<div class="demo-app data-export">
+				<h4>📁 Data Export Tool</h4>
+				<p class="demo-desc">Stream records with <code>iterate()</code> - memory efficient</p>
+
+				<div class="export-controls">
+					<select id="export-store" class="demo-select">
+						<option value="users">Users</option>
+						<option value="posts">Posts</option>
+						<option value="settings">Settings</option>
+					</select>
+					<select id="export-format" class="demo-select">
+						<option value="json">JSON</option>
+						<option value="csv">CSV</option>
+					</select>
+					<button id="export-btn" class="btn primary">📤 Export</button>
+				</div>
+
+				<div class="export-progress" id="export-progress" style="display: none;">
+					<div class="progress-bar">
+						<div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+					</div>
+					<span id="progress-text">0 records</span>
+				</div>
+
+				<div class="export-output">
+					<h5>Preview</h5>
+					<pre id="export-preview" class="code-preview"><code>Click Export to generate...</code></pre>
+				</div>
+
+				<div class="demo-log" id="export-log"></div>
+			</div>
+		`,init:(r,e)=>{const t=r.querySelector("#export-store"),s=r.querySelector("#export-format"),n=r.querySelector("#export-btn"),a=r.querySelector("#export-progress"),o=r.querySelector("#progress-fill"),i=r.querySelector("#progress-text"),c=r.querySelector("#export-preview code"),l=r.querySelector("#export-log");function u(m,d="info"){const p=document.createElement("div");p.className=`log-entry ${d}`,p.textContent=`${new Date().toLocaleTimeString()} - ${m}`,l.insertBefore(p,l.firstChild),l.children.length>5&&l.lastChild&&l.removeChild(l.lastChild)}n.onclick=()=>{const m=t.value,d=s.value;n.disabled=!0,a.style.display="block",o.style.width="0%";const p=e.store(m);(async()=>{try{const g=await p.count();u(`Exporting ${g} records from "${m}"...`);const v=performance.now(),C=await p.all(),A=C.length;o.style.width="100%",i.textContent=`${A} / ${g}`;const y=Math.round(performance.now()-v);u(`Completed: ${A} records in ${y}ms`,"success");let w;if(d==="json")w=JSON.stringify(C,null,2);else if(C.length===0)w="(no data)";else{const f=C[0],x=Object.keys(f),S=C.map(q=>{const D=q;return x.map(O=>JSON.stringify(D[O]??"")).join(",")});w=[x.join(","),...S].join(`
+`)}c.textContent=w.length>1500?w.substring(0,1500)+`
+... (truncated)`:w,n.disabled=!1}catch(g){u(`Export failed: ${g instanceof Error?g.message:"Unknown"}`,"error"),n.disabled=!1}})()}}}}function Lt(){return{html:`
+			<div class="demo-app email-lookup">
+				<h4>📧 Email Lookup</h4>
+				<p class="demo-desc">Fast O(1) lookups with <code>index().get()</code></p>
+
+				<div class="lookup-form">
+					<input type="email" id="lookup-email" placeholder="Enter email..." class="demo-input" list="email-suggestions" />
+					<datalist id="email-suggestions">
+						<option value="alice@example.com">
+						<option value="bob@example.com">
+						<option value="carol@example.com">
+					</datalist>
+					<button id="lookup-btn" class="btn primary">🔍 Lookup</button>
+				</div>
+
+				<div class="lookup-stats" id="lookup-stats" style="display: none;">
+					<span class="stat">Time: <strong id="lookup-time">0</strong>ms</span>
+				</div>
+
+				<div class="lookup-result" id="lookup-result">
+					<p class="placeholder">Enter an email to search...</p>
+				</div>
+
+				<div class="lookup-code">
+					<h5>💻 Code</h5>
+					<pre><code>// O(1) index lookup
+const user = await store.index('byEmail').get('alice@example.com')</code></pre>
+				</div>
+			</div>
+		`,init:(r,e)=>{const t=r.querySelector("#lookup-email"),s=r.querySelector("#lookup-btn"),n=r.querySelector("#lookup-result"),a=r.querySelector("#lookup-stats"),o=r.querySelector("#lookup-time"),i=r.querySelector("#email-suggestions"),c=e.store("users"),l=c.index("byEmail");c.all().then(m=>{const d=m.slice(0,10).map(p=>p.email);i.innerHTML=d.map(p=>`<option value="${p}">`).join("")}).catch(()=>{});function u(){const m=t.value.trim();if(!m){n.innerHTML='<p class="placeholder">Enter an email to search...</p>',a.style.display="none";return}const d=performance.now();l.get(m).then(p=>{const g=performance.now()-d;a.style.display="flex",o.textContent=g.toFixed(2),p?n.innerHTML=`
+							<div class="user-card found">
+								<h5>✅ User Found</h5>
+								<div class="user-details">
+									<p><strong>Name:</strong> ${p.name}</p>
+									<p><strong>Email:</strong> ${p.email}</p>
+									<p><strong>Age:</strong> ${p.age}</p>
+									<p><strong>Status:</strong> ${p.status}</p>
+								</div>
+							</div>
+						`:n.innerHTML=`
+							<div class="user-card not-found">
+								<h5>❌ Not Found</h5>
+								<p>No user with email "${m}"</p>
+							</div>
+						`}).catch(()=>{})}s.onclick=u,t.onkeypress=m=>{m.key==="Enter"&&u()}}}}function Kt(){return{html:`
+			<div class="demo-app registration">
+				<h4>📝 User Registration</h4>
+				<p class="demo-desc">Handle <code>ConstraintError</code> and <code>NotFoundError</code></p>
+
+				<div class="registration-form">
+					<input type="text" id="reg-name" placeholder="Full Name" class="demo-input" />
+					<input type="email" id="reg-email" placeholder="Email (try alice@example.com)" class="demo-input" />
+					<button id="reg-submit" class="btn primary">Create Account</button>
+				</div>
+
+				<div class="registration-result" id="reg-result"></div>
+
+				<div class="error-demo-section">
+					<h5>Try These Scenarios:</h5>
+					<button class="btn small scenario-btn" data-scenario="duplicate">1. Duplicate Email</button>
+					<button class="btn small scenario-btn" data-scenario="notfound">2. Missing User</button>
+					<button class="btn small scenario-btn" data-scenario="success">3. Success</button>
+				</div>
+
+				<div class="demo-log" id="reg-log"></div>
+			</div>
+		`,init:(r,e)=>{const t=r.querySelector("#reg-name"),s=r.querySelector("#reg-email"),n=r.querySelector("#reg-submit"),a=r.querySelector("#reg-result"),o=r.querySelector("#reg-log"),i=e.store("users");function c(m,d="info"){const p=document.createElement("div");p.className=`log-entry ${d}`,p.textContent=`${new Date().toLocaleTimeString()} - ${m}`,o.insertBefore(p,o.firstChild),o.children.length>6&&o.lastChild&&o.removeChild(o.lastChild)}function l(m,d){a.innerHTML=`<div class="result-box ${d?"success":"error"}">${m}</div>`}async function u(m,d){try{await i.index("byEmail").get(d)&&c(`Email "${d}" already registered`,"error");const g={id:`u-${Date.now()}`,name:m,email:d,age:25,status:"active",role:"user",tags:[],createdAt:Date.now()};await i.add(g),c(`User "${m}" registered!`,"success"),l(`<h5>✅ Success!</h5><p>Welcome, ${m}!</p>`,!0)}catch(p){if(p instanceof Error&&p.name==="ConstraintError")c("ConstraintError: Duplicate key","error"),l(`<h5>❌ Failed</h5><p>Email "${d}" already exists.</p>`,!1);else{const g=p instanceof Error?p.message:"Unknown";c(`Error: ${g}`,"error"),l(`<h5>❌ Error</h5><p>${g}</p>`,!1)}}}n.onclick=()=>{const m=t.value.trim(),d=s.value.trim();if(!m||!d){c("Please fill all fields","error");return}u(m,d)},r.querySelectorAll(".scenario-btn").forEach(m=>{const d=m;d.onclick=()=>{switch(d.dataset.scenario){case"duplicate":t.value="Test User",s.value="alice@example.com",u("Test User","alice@example.com");break;case"notfound":c("Calling resolve() for missing user...","info"),i.resolve("nonexistent-id").catch(g=>{g instanceof Error&&g.name==="NotFoundError"&&(c("NotFoundError: User not found","error"),l("<h5>❌ NotFoundError</h5><p>User not found.</p>",!1))});break;case"success":{const g=`user-${Date.now()}@example.com`;t.value="New User",s.value=g,u("New User",g);break}}}}),c("Registration demo ready!","info")}}}let h,j="store";const W=[],ye=[],z=[],ge=[{id:"store",emoji:"⚡",label:"Bulk Performance",description:"Insert 10,000+ records with real-time metrics, query performance benchmarks",demo:Pt},{id:"index",emoji:"🔖",label:"Index Operations",description:"O(1) lookups, multi-entry indexes, unique constraints",demo:Lt},{id:"query",emoji:"🔍",label:"Query Builder",description:"where, filter, orderBy, limit, offset, terminal operations",demo:$t},{id:"transactions",emoji:"💳",label:"Transactions",description:"Atomic multi-store operations, durability options, abort/rollback",demo:Ut},{id:"cursors",emoji:"📁",label:"Cursors",description:"Memory-efficient streaming, iterate, iterateKeys, navigation",demo:Bt},{id:"events",emoji:"🌐",label:"Cross-Tab Sync",description:"FEATURED: Real-time synchronization between browser tabs",demo:Mt},{id:"errors",emoji:"⚠️",label:"Error Handling",description:"Error classes, type guards, comprehensive patterns",demo:Kt}];function Ft(r){switch(r){case"store":return[{id:"get",title:"get() - Optional Lookup",description:"Returns undefined for missing records",run:()=>Ue(h)},{id:"resolve",title:"resolve() - Required Lookup",description:"Throws NotFoundError for missing records",run:()=>Me(h)},{id:"set",title:"set() - Upsert (single or batch)",description:"Insert or update records, supports arrays",run:()=>Be(h)},{id:"add",title:"add() - Insert Only",description:"Throws ConstraintError if key exists",run:()=>Le(h)},{id:"remove",title:"remove() - Delete",description:"Silently succeeds for missing keys",run:()=>Ke(h)},{id:"has",title:"has() - Existence Check",description:"Check if records exist",run:()=>Fe(h)},{id:"bulk",title:"Bulk Operations",description:"all(), keys(), count(), clear()",run:()=>_e(h)},{id:"accessors",title:"Store Accessors",description:"getName, getKeyPath, getIndexNames",run:()=>Ve(h)}];case"index":return[{id:"accessors",title:"Index Accessors",description:"getName, getKeyPath, isUnique, isMultiEntry",run:()=>je(h)},{id:"lookup",title:"Index Lookup",description:"get, resolve, getKey by index",run:()=>He(h)},{id:"nonunique",title:"Non-Unique Index",description:"Query non-unique index values",run:()=>Ge(h)},{id:"multientry",title:"Multi-Entry Index",description:"Index array elements separately",run:()=>Qe(h)},{id:"range",title:"Range Queries",description:"Numeric range queries on index",run:()=>We(h)},{id:"native",title:"Native Access",description:"Access native IDBIndex",run:()=>ze(h)}];case"query":return[{id:"equals",title:"where().equals()",description:"Fast indexed equality query",run:()=>Je(h)},{id:"comparison",title:"Comparison Queries",description:"greaterThan, lessThan, between",run:()=>Xe(h)},{id:"startswith",title:"startsWith()",description:"String prefix queries",run:()=>Ye(h)},{id:"anyof",title:"anyOf()",description:"Multiple value queries",run:()=>Ze(h)},{id:"filter",title:"filter()",description:"Post-cursor filtering",run:()=>et(h)},{id:"combined",title:"Combined Query",description:"where() + filter() for optimal performance",run:()=>tt(h)},{id:"ordering",title:"Ordering & Pagination",description:"orderBy, limit, offset",run:()=>st(h)},{id:"terminal",title:"Terminal Operations",description:"toArray, first, count, keys, iterate",run:()=>rt(h)},{id:"iterate",title:"iterate()",description:"Memory-efficient async generator",run:()=>nt(h)},{id:"boolean",title:"Boolean Queries",description:"Automatic fallback for non-indexable types",run:()=>at(h)}];case"transactions":return[{id:"read",title:"Read Transaction",description:"Consistent reads across stores",run:()=>ot(h)},{id:"write",title:"Write Transaction",description:"Atomic multi-store modifications",run:()=>it(h)},{id:"durability",title:"Durability Options",description:"default, strict, relaxed",run:()=>ct(h)},{id:"accessors",title:"Transaction Accessors",description:"getMode, getStoreNames, isActive",run:()=>lt(h)},{id:"abort",title:"Transaction Abort",description:"Roll back all changes",run:()=>ut(h)},{id:"native",title:"Native Access",description:"Access native IDBTransaction",run:()=>dt(h)}];case"cursors":return[{id:"iterate",title:"iterate()",description:"Async generator for records",run:()=>mt(h)},{id:"iteratekeys",title:"iterateKeys()",description:"Key-only iteration",run:()=>ht(h)},{id:"manual",title:"Manual Cursor",description:"openCursor() for full control",run:()=>pt(h)},{id:"mutation",title:"Cursor Mutation",description:"Update and delete during iteration",run:()=>yt(h)},{id:"navigation",title:"Cursor Navigation",description:"continue, advance methods",run:()=>gt(h)},{id:"directions",title:"Cursor Directions",description:"next, previous, unique variants",run:()=>ft(h)},{id:"keycursor",title:"Key Cursor",description:"Efficient key-only cursor",run:()=>wt(h)},{id:"indexcursor",title:"Index Cursor",description:"Iterate through index",run:()=>bt(h)}];case"events":return[{id:"dbchange",title:"Database onChange",description:"All store changes",run:()=>vt(h)},{id:"storechange",title:"Store onChange",description:"Specific store changes",run:()=>xt(h)},{id:"crosstab",title:"Cross-Tab Sync",description:"BroadcastChannel synchronization",run:()=>Et()},{id:"onerror",title:"onError",description:"Error event handling",run:()=>Ct(h)},{id:"versionchange",title:"onVersionChange",description:"Handle version upgrades",run:()=>At(h)},{id:"onclose",title:"onClose",description:"Handle connection close",run:()=>St(h)},{id:"hooks",title:"Event Hooks",description:"Configure hooks at creation",run:()=>kt()}];case"errors":return[{id:"notfound",title:"NotFoundError",description:"resolve() for missing records",run:()=>Tt(h)},{id:"constraint",title:"ConstraintError",description:"add() for duplicate keys",run:()=>Nt(h)},{id:"codes",title:"Error Codes",description:"All error code enumeration",run:()=>qt()},{id:"guards",title:"Type Guards",description:"Safe error type checking",run:()=>Dt(h)},{id:"hierarchy",title:"Error Hierarchy",description:"Error class structure",run:()=>It()},{id:"comprehensive",title:"Comprehensive Handling",description:"Best practices pattern",run:()=>Ot(h)}]}}function b(r,e){const t=document.createElement(r);return e?.className&&(t.className=e.className),e?.textContent&&(t.textContent=e.textContent),e?.id&&(t.id=e.id),t}function _t(r){if(r===void 0)return"undefined";if(r===null)return"null";try{return JSON.stringify(r,null,2)}catch{return typeof r=="object"&&r!==null?"[Object]":typeof r=="string"?r:"[Unknown]"}}function fe(){z.forEach(l=>l()),z.length=0;const r=document.getElementById("app");if(!r)return;r.innerHTML="";const e=b("div",{className:"container"}),t=b("header"),s=b("h1",{textContent:"🗄️ IndexedDB Showcase"}),n=b("p",{textContent:"Comprehensive demonstration of ALL @mikesaintsg/indexeddb features"});t.append(s,n);const a=b("nav",{className:"tabs"});ge.forEach(l=>{const u=b("button",{className:`tab ${j===l.id?"active":""}`,textContent:`${l.emoji} ${l.label}`});u.title=l.description,u.addEventListener("click",()=>{j=l.id,fe()}),a.appendChild(u)});const o=b("main",{id:"content"});Vt(o);const i=b("footer"),c=b("p");c.innerHTML="💡 <strong>Open this page in another tab</strong> to see cross-tab sync in action!",i.appendChild(c),e.append(t,a,o,i),r.appendChild(e)}async function Vt(r){const e=ge.find(i=>i.id===j);if(!e)return;const t=b("section",{className:"card"}),s=b("h2",{textContent:`${e.emoji} ${e.label}`}),n=b("p",{className:"subtitle",textContent:e.description});if(t.append(s,n),e.demo){const i=e.demo(),c=b("div",{className:"interactive-demo-container"});if(c.innerHTML=i.html,t.appendChild(c),i.init)try{await i.init(c,h)}catch(u){console.error("Demo init error:",u)}i.cleanup&&z.push(i.cleanup);const l=b("div",{className:"demo-separator"});l.innerHTML='<h3 style="margin: 24px 0 16px; color: #6b7280; font-size: 0.95rem;">📚 API Reference Examples</h3>',t.appendChild(l)}const a=Ft(j),o=b("div",{className:"examples-container"});a.forEach(i=>{const c=jt(i);o.appendChild(c)}),t.appendChild(o),r.appendChild(t)}function jt(r){const e=b("div",{className:"example-card"}),t=b("div",{className:"example-header"}),s=b("h3",{textContent:r.title}),n=b("p",{className:"example-desc",textContent:r.description});t.append(s,n);const a=b("button",{className:"btn primary",textContent:"▶ Run Example"}),o=b("div",{className:"example-result"});return o.style.display="none",a.addEventListener("click",()=>{Ht(r,a,o)}),e.append(t,a,o),e}async function Ht(r,e,t){e.disabled=!0,e.textContent="⏳ Running...",t.style.display="block",t.innerHTML='<p class="loading">Running example...</p>';try{const s=await r.run();t.innerHTML="";const n=s.success?"success":"error",a=s.success?"✅":"❌",o=b("p",{className:`result-message ${n}`,textContent:`${a} ${s.message}`});if(t.appendChild(o),s.data!==void 0){const i=b("div",{className:"result-data"}),c=b("h4",{textContent:"📊 Result Data"}),l=b("pre"),u=b("code",{textContent:_t(s.data)});l.appendChild(u),i.append(c,l),t.appendChild(i)}if(s.code){const i=b("div",{className:"result-code"}),c=b("h4",{textContent:"💻 Code Example"}),l=b("div",{className:"code-block"}),u=b("pre"),m=b("code",{textContent:s.code});u.appendChild(m),l.appendChild(u),i.append(c,l),t.appendChild(i)}}catch(s){t.innerHTML="";const n=b("p",{className:"result-message error",textContent:`❌ Error: ${s instanceof Error?s.message:String(s)}`});t.appendChild(n)}finally{e.disabled=!1,e.textContent="▶ Run Example"}}function Gt(r){const e=["Alice","Bob","Carol","David","Emma","Frank","Grace","Henry","Ivy","Jack","Kate","Leo","Maya","Noah","Olivia","Peter","Quinn","Rose","Sam","Tara"],t=["Anderson","Brown","Clark","Davis","Evans","Foster","Garcia","Harris","Ivanov","Jones","Kim","Lee","Miller","Nelson","Ortiz","Park","Quinn","Roberts","Smith","Taylor"],s=["gmail.com","outlook.com","yahoo.com","proton.me","icloud.com"],n=["admin","user","user","user","guest"],a=["active","active","active","inactive"],o=["developer","designer","manager","marketing","sales","support","hr","finance","ops","engineering"],i=[];for(let c=0;c<r;c++){const l=e[Math.floor(Math.random()*e.length)]??"User",u=t[Math.floor(Math.random()*t.length)]??"Unknown",m=s[Math.floor(Math.random()*s.length)]??"example.com",d=n[Math.floor(Math.random()*n.length)]??"user",p=a[Math.floor(Math.random()*a.length)]??"active",g=Math.floor(Math.random()*4),v=[];for(let C=0;C<g;C++){const A=o[Math.floor(Math.random()*o.length)];A&&!v.includes(A)&&v.push(A)}i.push({id:`sample-${c}-${Date.now()}`,name:`${l} ${u}`,email:`${l.toLowerCase()}.${u.toLowerCase()}${c}@${m}`,age:18+Math.floor(Math.random()*50),status:p,role:d,tags:v,createdAt:Date.now()-Math.floor(Math.random()*365*24*60*60*1e3)})}return i}async function Qt(){try{h=$e(),await h.store("users").count()<50&&await Wt();const e=h.onChange(t=>{W.unshift({...t,timestamp:Date.now()}),W.length>100&&W.pop()});ye.push(e)}catch(r){console.error("Failed to initialize database:",r);const e=document.getElementById("app");throw e&&(e.innerHTML=`
+				<div style="max-width: 600px; margin: 50px auto; padding: 20px; background: #fee2e2; border-radius: 8px; text-align: center;">
+					<h2 style="color: #dc2626;">⚠️ Database Error</h2>
+					<p style="color: #991b1b;">Failed to initialize IndexedDB. This might happen if you're in private browsing mode or storage is full.</p>
+					<p style="color: #991b1b; font-size: 0.9rem;">${r instanceof Error?r.message:"Unknown error"}</p>
+					<button onclick="window.location.reload()" style="margin-top: 16px; padding: 8px 24px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
+						🔄 Retry
+					</button>
+				</div>
+			`),r}}async function Wt(){await h.store("users").set([...J]),await h.store("posts").set([...X]),await h.store("settings").set([...ce]);const r=Gt(100);await h.store("users").set(r)}Qt().then(()=>{fe()});window.addEventListener("beforeunload",()=>{ye.forEach(r=>r())});</script>
+  <style rel="stylesheet" crossorigin>*{box-sizing:border-box;margin:0;padding:0}:root{--primary: #4f46e5;--primary-hover: #4338ca;--danger: #dc2626;--danger-hover: #b91c1c;--warning: #f59e0b;--warning-hover: #d97706;--secondary: #6b7280;--secondary-hover: #4b5563;--success: #10b981;--bg: #f3f4f6;--card-bg: #ffffff;--text: #1f2937;--text-muted: #6b7280;--border: #e5e7eb;--radius: 8px;--shadow: 0 1px 3px rgba(0, 0, 0, .1);--shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, .1)}body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen,Ubuntu,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}.container{max-width:900px;margin:0 auto;padding:20px}header{text-align:center;margin-bottom:24px}header h1{font-size:2rem;margin-bottom:8px;color:var(--primary)}header p{color:var(--text-muted)}footer{text-align:center;margin-top:32px;padding:16px;color:var(--text-muted);font-size:.875rem;background:#e0e7ff;border-radius:var(--radius)}.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}.tab{padding:10px 20px;border:none;background:var(--card-bg);border-radius:var(--radius);cursor:pointer;font-size:.95rem;font-weight:500;transition:all .2s;box-shadow:var(--shadow)}.tab:hover{background:var(--border)}.tab.active{background:var(--primary);color:#fff}.card{background:var(--card-bg);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-lg)}.card h2{margin-bottom:4px;font-size:1.5rem}.card .subtitle{color:var(--text-muted);margin-bottom:20px;font-size:.875rem}.card code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:.85rem;color:var(--primary)}.form-row,.action-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}input[type=text],input[type=number],select{padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:.95rem;background:#fff;flex:1;min-width:120px}input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px #4f46e51a}input[type=number]{width:80px;flex:none}.btn{padding:10px 18px;border:none;border-radius:var(--radius);font-size:.95rem;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}.btn.small{padding:6px 12px;font-size:.85rem}.btn.primary{background:var(--primary);color:#fff}.btn.primary:hover{background:var(--primary-hover)}.btn.secondary{background:var(--secondary);color:#fff}.btn.secondary:hover{background:var(--secondary-hover)}.btn.warning{background:var(--warning);color:#fff}.btn.warning:hover{background:var(--warning-hover)}.btn.danger{background:var(--danger);color:#fff}.btn.danger:hover{background:var(--danger-hover)}.filter-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}.filter-btn{padding:6px 14px;border:1px solid var(--border);background:#fff;border-radius:20px;cursor:pointer;font-size:.875rem;transition:all .2s}.filter-btn:hover{background:var(--border)}.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}.todo-list{max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)}.todo-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .2s}.todo-item:last-child{border-bottom:none}.todo-item:hover{background:#f9fafb}.todo-item.completed .todo-title{text-decoration:line-through;color:var(--text-muted)}.todo-toggle{width:20px;height:20px;cursor:pointer;flex-shrink:0}.priority{font-size:1rem;flex-shrink:0}.todo-title{flex:1;font-size:.95rem}.todo-date{font-size:.75rem;color:var(--text-muted);flex-shrink:0}.delete-btn{width:28px;height:28px;border:none;background:transparent;color:var(--text-muted);font-size:1.2rem;cursor:pointer;border-radius:50%;transition:all .2s;flex-shrink:0}.delete-btn:hover{background:var(--danger);color:#fff}.stats{display:flex;gap:24px;padding-top:16px;border-top:1px solid var(--border);margin-top:16px;font-size:.875rem;color:var(--text-muted)}.stats strong{color:var(--text)}.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:16px}.note-card{padding:16px;border-radius:var(--radius);box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s}.note-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}.note-card h3{font-size:1rem;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.note-card p{font-size:.875rem;color:#374151;margin-bottom:12px;max-height:60px;overflow:hidden}.note-footer{display:flex;justify-content:space-between;align-items:center;font-size:.75rem;color:var(--text-muted)}.delete-note-btn{width:24px;height:24px;border:none;background:#0000001a;border-radius:50%;cursor:pointer;font-size:1rem;line-height:1}.delete-note-btn:hover{background:var(--danger);color:#fff}.query-builder{background:#f8fafc;padding:20px;border-radius:var(--radius);margin-bottom:20px}.query-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}.query-row label{width:140px;font-weight:500;font-size:.875rem;flex-shrink:0}.query-row select{flex:none;width:180px}.query-results{min-height:100px;margin-bottom:20px}.query-results table{width:100%;border-collapse:collapse}.query-results th,.query-results td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}.query-results th{background:#f8fafc;font-weight:600;font-size:.875rem}.query-results td{font-size:.875rem}.query-results tr.completed td{color:var(--text-muted)}.result-count{margin-top:12px;font-size:.875rem;color:var(--text-muted)}.code-section h3{font-size:.95rem;margin-bottom:8px;color:var(--text-muted)}.code-block{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:var(--radius);overflow-x:auto}.code-block pre{margin:0;font-family:Fira Code,Monaco,Consolas,monospace;font-size:.85rem;line-height:1.6}.info-box{background:#dbeafe;border:1px solid #93c5fd;padding:16px;border-radius:var(--radius);margin-bottom:20px}.info-box p{color:#1e40af;margin:0 0 8px}.info-box p:last-child{margin-bottom:0}.event-log{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:var(--radius);max-height:400px;overflow-y:auto;font-family:Fira Code,Monaco,Consolas,monospace;font-size:.85rem}.event-list{list-style:none}.event-list li{padding:8px 12px;border-bottom:1px solid #334155;display:flex;gap:12px;align-items:center}.event-list li:last-child{border-bottom:none}.event-list li.local{border-left:3px solid #3b82f6}.event-list li.remote{border-left:3px solid #f59e0b;background:#f59e0b1a}.event-time{color:#94a3b8;font-size:.75rem}.event-source{font-weight:600;font-size:.75rem;padding:2px 6px;border-radius:4px}.event-list li.local .event-source{background:#3b82f6;color:#fff}.event-list li.remote .event-source{background:#f59e0b;color:#fff}.event-type{color:#22c55e}.event-store{color:#a78bfa}.event-keys{color:#94a3b8;font-size:.75rem}.loading{text-align:center;padding:40px;color:var(--text-muted)}.empty,.placeholder{text-align:center;padding:40px;color:var(--text-muted);font-style:italic}.error{color:var(--danger);text-align:center;padding:20px}.examples-container{display:flex;flex-direction:column;gap:16px}.example-card{border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fafafa}.example-header{margin-bottom:12px}.example-header h3{font-size:1rem;margin-bottom:4px;color:var(--primary)}.example-desc{font-size:.85rem;color:var(--text-muted);margin:0 0 8px}.example-usecase{font-size:.85rem;color:#1e40af;background:#dbeafe;padding:8px 12px;border-radius:var(--radius);margin:0;border-left:3px solid var(--primary)}.example-result{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}.result-message{font-weight:500;padding:8px 12px;border-radius:var(--radius);margin:0 0 12px}.result-message.success{background:#d4edda;color:#155724}.result-message.error{background:#f8d7da;color:#721c24}.result-data,.result-code{margin-top:12px}.result-data h4,.result-code h4{font-size:.85rem;color:var(--text-muted);margin-bottom:8px}.result-data pre{background:#f1f5f9;padding:12px;border-radius:var(--radius);overflow-x:auto;font-size:.8rem;line-height:1.4;max-height:300px;overflow-y:auto}.result-data code{font-family:Fira Code,Monaco,Consolas,monospace}.demo-app{background:#fff;border:2px solid var(--primary);border-radius:var(--radius);padding:20px;margin-bottom:24px}.demo-app h4{font-size:1.1rem;color:var(--primary);margin-bottom:8px}.demo-app .demo-desc{font-size:.85rem;color:var(--text-muted);margin-bottom:16px}.demo-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.demo-input{padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:.9rem;flex:1;min-width:120px}.demo-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px #4f46e51a}.demo-input.small{flex:none;width:80px}.demo-select{padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:.9rem;background:#fff;cursor:pointer}.demo-stats{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}.demo-stats .stat{font-size:.85rem;color:var(--text-muted)}.demo-stats .stat strong{color:var(--primary)}.demo-list{border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto;margin-bottom:16px}.demo-list .placeholder{padding:24px;text-align:center;color:var(--text-muted);font-style:italic}.list-item{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);gap:12px}.list-item:last-child{border-bottom:none}.list-item:hover{background:#f9fafb}.item-info{flex:1;min-width:0}.item-info strong{display:block;font-size:.95rem;margin-bottom:2px}.item-meta{font-size:.8rem;color:var(--text-muted)}.item-actions{display:flex;gap:6px;flex-shrink:0}.demo-log{background:#1e293b;color:#e2e8f0;padding:12px;border-radius:var(--radius);font-family:Fira Code,Monaco,Consolas,monospace;font-size:.8rem;max-height:150px;overflow-y:auto}.log-entry{padding:4px 0;border-bottom:1px solid #334155}.log-entry:last-child{border-bottom:none}.log-entry.info{color:#94a3b8}.log-entry.success{color:#22c55e}.log-entry.error{color:#f87171}.query-display{background:#f8fafc;padding:12px;border-radius:var(--radius);margin-bottom:16px;font-size:.85rem}.query-display code{display:block;margin-top:8px;white-space:pre-wrap;word-break:break-all;color:var(--primary)}.cart-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px}@media(max-width:700px){.cart-layout{grid-template-columns:1fr}}.cart-products,.cart-summary{background:#f8fafc;padding:16px;border-radius:var(--radius)}.cart-products h5,.cart-summary h5{font-size:.95rem;margin-bottom:12px;color:var(--text)}.product-list{display:flex;flex-direction:column;gap:8px}.product-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:var(--radius);gap:8px}.product-name{flex:1;font-size:.9rem}.product-price{font-weight:600;color:var(--primary)}.cart-items{min-height:100px;margin-bottom:12px}.cart-item{display:flex;justify-content:space-between;align-items:center;padding:8px;background:#fff;border-radius:4px;margin-bottom:6px;font-size:.85rem}.cart-total{padding:12px;background:#fff;border-radius:var(--radius);text-align:right;font-size:1.1rem;margin-bottom:12px}.cart-total strong{color:var(--primary)}.monitor-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.monitor-stats{display:flex;gap:20px;margin-bottom:16px}.event-feed{border:1px solid var(--border);border-radius:var(--radius);max-height:250px;overflow-y:auto;margin-bottom:16px}.event-entry{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:.85rem;align-items:center;flex-wrap:wrap}.event-entry:last-child{border-bottom:none}.event-time{color:var(--text-muted);font-size:.75rem}.event-badge{padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase}.event-badge.set{background:#dbeafe;color:#1e40af}.event-badge.add{background:#d1fae5;color:#065f46}.event-badge.remove{background:#fee2e2;color:#991b1b}.event-store{color:var(--primary);font-weight:500}.event-keys{color:var(--text-muted);font-size:.8rem}.event-cross-tab{background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;font-size:.7rem}.demo-tip{font-size:.85rem;color:var(--text-muted);font-style:italic;margin-top:12px}.export-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.export-progress{margin-bottom:16px}.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px}.progress-fill{height:100%;background:var(--primary);transition:width .1s}#progress-text{font-size:.8rem;color:var(--text-muted)}.export-output h5{font-size:.9rem;margin-bottom:8px}.code-preview{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:var(--radius);max-height:200px;overflow:auto;font-size:.8rem}.lookup-form{display:flex;gap:8px;margin-bottom:16px}.lookup-stats{display:flex;gap:16px;margin-bottom:16px;font-size:.85rem}.lookup-result{margin-bottom:16px}.user-card{padding:16px;border-radius:var(--radius)}.user-card.found{background:#d1fae5;border:1px solid #10b981}.user-card.not-found{background:#fee2e2;border:1px solid #ef4444}.user-card h5{margin-bottom:8px}.user-details p{font-size:.9rem;margin:4px 0}.lookup-code{background:#f8fafc;padding:16px;border-radius:var(--radius)}.lookup-code h5{margin-bottom:8px;font-size:.9rem}.lookup-code pre{background:#1e293b;color:#e2e8f0;padding:12px;border-radius:var(--radius);font-size:.8rem;overflow-x:auto}.registration-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.registration-result{margin-bottom:16px}.result-box{padding:16px;border-radius:var(--radius)}.result-box.success{background:#d1fae5;border:1px solid #10b981}.result-box.error{background:#fee2e2;border:1px solid #ef4444}.result-box h5{margin-bottom:8px}.result-box pre{background:#1e293b;color:#e2e8f0;padding:12px;border-radius:var(--radius);font-size:.8rem;margin-top:12px;overflow-x:auto}.error-demo-section{background:#f8fafc;padding:16px;border-radius:var(--radius);margin-bottom:16px}.error-demo-section h5{margin-bottom:12px;font-size:.9rem}.scenario-btn{margin:4px}.demo-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.syntax-code{background:#1e1e2e;color:#cdd6f4;padding:16px 20px;border-radius:var(--radius);overflow-x:auto;font-family:Fira Code,Monaco,Consolas,Courier New,monospace;font-size:.85rem;line-height:1.7;border:1px solid #313244}.syntax-code .keyword{color:#cba6f7;font-weight:500}.syntax-code .function{color:#89b4fa}.syntax-code .string{color:#a6e3a1}.syntax-code .number{color:#fab387}.syntax-code .comment{color:#6c7086;font-style:italic}.syntax-code .property{color:#89dceb}.syntax-highlight{display:block;background:#1e1e2e;color:#89b4fa;padding:12px 16px;border-radius:var(--radius);font-family:Fira Code,Monaco,Consolas,monospace;font-size:.85rem;border:1px solid #313244}.bulk-performance .performance-panel{background:linear-gradient(135deg,#1e1e2e,#313244);padding:20px;border-radius:var(--radius);margin-bottom:20px}.bulk-performance .perf-controls{margin-bottom:16px}.bulk-performance .perf-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bulk-performance .perf-row label{color:#cdd6f4;font-weight:500}.bulk-performance .perf-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}.perf-stat-card{background:#ffffff0d;border:1px solid rgba(255,255,255,.1);border-radius:var(--radius);padding:16px;text-align:center}.perf-stat-card .perf-label{display:block;color:#a6adc8;font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}.perf-stat-card .perf-value{display:block;color:#89b4fa;font-size:1.5rem;font-weight:700;font-family:Fira Code,monospace}.bulk-performance .perf-progress{background:#0003;padding:16px;border-radius:var(--radius)}.bulk-performance .query-section{background:#f8fafc;padding:20px;border-radius:var(--radius);margin-bottom:16px}.bulk-performance .query-section h5{margin-bottom:12px;color:var(--text)}.bulk-performance .query-row{display:flex;gap:10px;margin-bottom:16px}.query-result-box{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px}.query-result-box .query-meta{display:flex;gap:20px;margin-bottom:12px;font-size:.9rem}.query-result-box .query-code-block{margin-bottom:12px}.query-result-box .query-preview{background:#f1f5f9;padding:12px;border-radius:var(--radius)}.query-result-box .query-preview pre{margin:8px 0 0;font-size:.8rem;max-height:200px;overflow:auto}.cross-tab-sync.featured-demo{border:3px solid #f59e0b;background:linear-gradient(135deg,#fffbeb,#fef3c7)}.featured-banner{display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;padding:10px 20px;border-radius:var(--radius);margin-bottom:16px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:.85rem}.featured-banner .featured-icon{font-size:1.2rem}.cross-tab-instruction{background:#fff;border:2px dashed #f59e0b;border-radius:var(--radius);padding:16px;margin-bottom:20px}.instruction-step{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #fef3c7}.instruction-step:last-child{border-bottom:none}.step-number{width:28px;height:28px;background:#f59e0b;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}.step-text{flex:1;font-size:.95rem}.sync-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}.sync-controls .large-btn{padding:14px 20px;font-size:.95rem}.sync-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}@media(max-width:600px){.sync-stats{grid-template-columns:1fr}}.sync-stat-card{background:#fff;border-radius:var(--radius);padding:16px;text-align:center;border:2px solid var(--border);transition:all .3s ease}.sync-stat-card.local{border-color:#3b82f6}.sync-stat-card.remote{border-color:#f59e0b;background:#fffbeb}.sync-stat-card.total{border-color:#10b981}.sync-stat-card.flash{animation:flash-highlight .5s ease}@keyframes flash-highlight{0%,to{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 20px #f59e0b80}}.sync-stat-label{display:block;font-size:.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}.sync-stat-value{display:block;font-size:2rem;font-weight:700;font-family:Fira Code,monospace;color:var(--primary)}.sync-stat-card.remote .sync-stat-value{color:#f59e0b}.sync-stat-card.total .sync-stat-value{color:#10b981}.sync-stat-desc{display:block;font-size:.75rem;color:var(--text-muted);margin-top:4px}.enhanced-feed{background:#1e1e2e;border:1px solid #313244;border-radius:var(--radius);max-height:350px;overflow-y:auto;margin-bottom:16px}.enhanced-feed .placeholder{color:#6c7086;padding:30px}.event-entry.enhanced{padding:12px 16px;border-bottom:1px solid #313244;animation:slide-in .3s ease}@keyframes slide-in{0%{opacity:0;transform:translate(-20px)}to{opacity:1;transform:translate(0)}}.event-entry.enhanced.local-event{background:#3b82f61a;border-left:4px solid #3b82f6}.event-entry.enhanced.remote-event{background:#f59e0b26;border-left:4px solid #f59e0b}.event-header{display:flex;gap:10px;align-items:center;margin-bottom:6px;flex-wrap:wrap}.source-badge{padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase}.source-badge.local{background:#3b82f6;color:#fff}.source-badge.remote{background:#f59e0b;color:#fff;animation:pulse 1s ease}@keyframes pulse{0%,to{opacity:1}50%{opacity:.7}}.type-badge{padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600}.type-badge.set{background:#dbeafe;color:#1e40af}.type-badge.add{background:#d1fae5;color:#065f46}.type-badge.remove{background:#fee2e2;color:#991b1b}.event-details{display:flex;gap:16px;font-size:.8rem;flex-wrap:wrap}.event-details .event-store{color:#a6adc8}.event-details .event-store strong{color:#89dceb}.event-details .event-keys{color:#6c7086}.event-details .event-keys code{background:#0000004d;padding:2px 6px;border-radius:4px;font-size:.75rem;color:#a6e3a1}.code-example-box{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}.code-example-box h5{margin-bottom:12px}@media(max-width:600px){.container{padding:12px}header h1{font-size:1.5rem}.tabs{gap:4px}.tab{padding:8px 12px;font-size:.85rem}.form-row{flex-direction:column}.form-row input,.form-row select{width:100%}.action-row{flex-direction:column}.action-row .btn{width:100%}.query-row{flex-direction:column;align-items:stretch}.query-row label,.query-row select{width:100%}.stats{flex-direction:column;gap:8px}.bulk-performance .perf-row{flex-direction:column;align-items:stretch}.bulk-performance .query-row,.sync-controls{flex-direction:column}.sync-controls .large-btn{width:100%}}</style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"></div>
 </body>
 </html>
