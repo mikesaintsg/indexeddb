@@ -417,31 +417,61 @@ function generateAdditionalUsers(count: number): User[] {
 }
 
 async function initializeDatabase(): Promise<void> {
-	db = createShowcaseDatabase()
+	try {
+		db = createShowcaseDatabase()
 
-	// Load sample data - always ensure we have enough data for demos
-	const existingUsers = await db.store('users').count()
-	if (existingUsers < 50) {
-		// Add base sample users first
-		await db.store('users').set([...SAMPLE_USERS])
-		await db.store('posts').set([...SAMPLE_POSTS])
-		await db.store('settings').set([...SAMPLE_SETTINGS])
+		// Load sample data - always ensure we have enough data for demos
+		const existingUsers = await db.store('users').count()
+		if (existingUsers < 50) {
+			await ensureSampleData()
+		}
 
-		// Add additional users for better demo experience (100 users total)
-		const additionalUsers = generateAdditionalUsers(100)
-		await db.store('users').set(additionalUsers)
-	}
-
-	// Set up event logging
-	const unsubscribe = db.onChange((event: ChangeEvent) => {
-		eventLog.unshift({
-			...event,
-			timestamp: Date.now(),
+		// Set up event logging
+		const unsubscribe = db.onChange((event: ChangeEvent) => {
+			eventLog.unshift({
+				...event,
+				timestamp: Date.now(),
+			})
+			if (eventLog.length > 100) eventLog.pop()
 		})
-		if (eventLog.length > 100) eventLog.pop()
-	})
-	unsubscribes.push(unsubscribe)
+		unsubscribes.push(unsubscribe)
+	} catch (error) {
+		console.error('Failed to initialize database:', error)
+		// Show error in UI
+		const app = document.getElementById('app')
+		if (app) {
+			app.innerHTML = `
+				<div style="max-width: 600px; margin: 50px auto; padding: 20px; background: #fee2e2; border-radius: 8px; text-align: center;">
+					<h2 style="color: #dc2626;">⚠️ Database Error</h2>
+					<p style="color: #991b1b;">Failed to initialize IndexedDB. This might happen if you're in private browsing mode or storage is full.</p>
+					<p style="color: #991b1b; font-size: 0.9rem;">${error instanceof Error ? error.message : 'Unknown error'}</p>
+					<button onclick="window.location.reload()" style="margin-top: 16px; padding: 8px 24px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
+						🔄 Retry
+					</button>
+				</div>
+			`
+		}
+		throw error
+	}
 }
+
+/**
+ * Ensures sample data exists in all stores.
+ * Called on init and after clearing data.
+ */
+async function ensureSampleData(): Promise<void> {
+	// Add base sample users first
+	await db.store('users').set([...SAMPLE_USERS])
+	await db.store('posts').set([...SAMPLE_POSTS])
+	await db.store('settings').set([...SAMPLE_SETTINGS])
+
+	// Add additional users for better demo experience (100 users total)
+	const additionalUsers = generateAdditionalUsers(100)
+	await db.store('users').set(additionalUsers)
+}
+
+// Export for use in interactive demos
+export { ensureSampleData }
 
 // ============================================================================
 // Initialize App
