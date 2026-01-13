@@ -17,7 +17,7 @@
 
 import './styles.css'
 import type { DatabaseInterface, ChangeEvent, Unsubscribe } from '~/src/types.js'
-import type { ExampleResult, AppSchema, EventLogEntry } from './examples/types.js'
+import type { ExampleResult, AppSchema, EventLogEntry, User } from './examples/types.js'
 import { SAMPLE_USERS, SAMPLE_POSTS, SAMPLE_SETTINGS } from './examples/types.js'
 import { createShowcaseDatabase } from './examples/database-setup.js'
 import * as storeOps from './examples/store-operations.js'
@@ -379,15 +379,57 @@ async function runExample(
 // Database Initialization
 // ============================================================================
 
+// Generate additional sample users for better demo experience
+function generateAdditionalUsers(count: number): User[] {
+	const FIRST_NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack', 'Kate', 'Leo', 'Maya', 'Noah', 'Olivia', 'Peter', 'Quinn', 'Rose', 'Sam', 'Tara']
+	const LAST_NAMES = ['Anderson', 'Brown', 'Clark', 'Davis', 'Evans', 'Foster', 'Garcia', 'Harris', 'Ivanov', 'Jones', 'Kim', 'Lee', 'Miller', 'Nelson', 'Ortiz', 'Park', 'Quinn', 'Roberts', 'Smith', 'Taylor']
+	const DOMAINS = ['gmail.com', 'outlook.com', 'yahoo.com', 'proton.me', 'icloud.com']
+	const ROLES: ('admin' | 'user' | 'guest')[] = ['admin', 'user', 'user', 'user', 'guest']
+	const STATUSES: ('active' | 'inactive')[] = ['active', 'active', 'active', 'inactive']
+	const TAGS = ['developer', 'designer', 'manager', 'marketing', 'sales', 'support', 'hr', 'finance', 'ops', 'engineering']
+
+	const users: User[] = []
+	for (let i = 0; i < count; i++) {
+		const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)] ?? 'User'
+		const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)] ?? 'Unknown'
+		const domain = DOMAINS[Math.floor(Math.random() * DOMAINS.length)] ?? 'example.com'
+		const role = ROLES[Math.floor(Math.random() * ROLES.length)] ?? 'user'
+		const status = STATUSES[Math.floor(Math.random() * STATUSES.length)] ?? 'active'
+		const tagCount = Math.floor(Math.random() * 4)
+		const userTags: string[] = []
+		for (let j = 0; j < tagCount; j++) {
+			const tag = TAGS[Math.floor(Math.random() * TAGS.length)]
+			if (tag && !userTags.includes(tag)) userTags.push(tag)
+		}
+
+		users.push({
+			id: `sample-${i}-${Date.now()}`,
+			name: `${firstName} ${lastName}`,
+			email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@${domain}`,
+			age: 18 + Math.floor(Math.random() * 50),
+			status,
+			role,
+			tags: userTags,
+			createdAt: Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000),
+		})
+	}
+	return users
+}
+
 async function initializeDatabase(): Promise<void> {
 	db = createShowcaseDatabase()
 
-	// Load sample data
+	// Load sample data - always ensure we have enough data for demos
 	const existingUsers = await db.store('users').count()
-	if (existingUsers === 0) {
+	if (existingUsers < 50) {
+		// Add base sample users first
 		await db.store('users').set([...SAMPLE_USERS])
 		await db.store('posts').set([...SAMPLE_POSTS])
 		await db.store('settings').set([...SAMPLE_SETTINGS])
+
+		// Add additional users for better demo experience (100 users total)
+		const additionalUsers = generateAdditionalUsers(100)
+		await db.store('users').set(additionalUsers)
 	}
 
 	// Set up event logging

@@ -138,20 +138,20 @@ export function createContactManagerDemo(): InteractiveDemoResult {
 		`,
 		init: async(container, db) => {
 			const store = db.store('users')
-			const totalEl = container.querySelector('#total-records')!
-			const insertTimeEl = container.querySelector('#insert-time')!
-			const insertRateEl = container.querySelector('#insert-rate')!
-			const queryTimeEl = container.querySelector('#query-time')!
-			const progressEl = container.querySelector('#perf-progress')!
-			const progressFill = container.querySelector('#perf-progress-fill')!
-			const progressText = container.querySelector('#perf-progress-text')!
-			const bulkCountSelect = container.querySelector('#bulk-count')!
-			const bulkInsertBtn = container.querySelector('#bulk-insert-btn')!
-			const bulkClearBtn = container.querySelector('#bulk-clear-btn')!
-			const queryTypeSelect = container.querySelector('#query-type')!
-			const runQueryBtn = container.querySelector('#run-query-btn')!
-			const queryResultsEl = container.querySelector('#query-results')!
-			const logEl = container.querySelector('#bulk-log')!
+			const totalEl = container.querySelector('#total-records') as HTMLElement
+			const insertTimeEl = container.querySelector('#insert-time') as HTMLElement
+			const insertRateEl = container.querySelector('#insert-rate') as HTMLElement
+			const queryTimeEl = container.querySelector('#query-time') as HTMLElement
+			const progressEl = container.querySelector('#perf-progress') as HTMLElement
+			const progressFill = container.querySelector('#perf-progress-fill') as HTMLElement
+			const progressText = container.querySelector('#perf-progress-text') as HTMLElement
+			const bulkCountSelect = container.querySelector('#bulk-count') as HTMLSelectElement
+			const bulkInsertBtn = container.querySelector('#bulk-insert-btn') as HTMLButtonElement
+			const bulkClearBtn = container.querySelector('#bulk-clear-btn') as HTMLButtonElement
+			const queryTypeSelect = container.querySelector('#query-type') as HTMLSelectElement
+			const runQueryBtn = container.querySelector('#run-query-btn') as HTMLButtonElement
+			const queryResultsEl = container.querySelector('#query-results') as HTMLElement
+			const logEl = container.querySelector('#bulk-log') as HTMLElement
 
 			function log(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
 				const entry = document.createElement('div')
@@ -380,13 +380,13 @@ export function createUserSearchDemo(): InteractiveDemoResult {
 		`,
 		init: (container, db) => {
 			const store = db.store('users')
-			const resultsEl = container.querySelector('#search-results')!
-			const countEl = container.querySelector('#search-count')!
-			const timeEl = container.querySelector('#search-time')!
-			const queryCodeEl = container.querySelector('#query-code')!
-			const searchInput = container.querySelector('#search-name')!
-			const statusSelect = container.querySelector('#filter-status')!
-			const roleSelect = container.querySelector('#filter-role')!
+			const resultsEl = container.querySelector('#search-results') as HTMLElement
+			const countEl = container.querySelector('#search-count') as HTMLElement
+			const timeEl = container.querySelector('#search-time') as HTMLElement
+			const queryCodeEl = container.querySelector('#query-code') as HTMLElement
+			const searchInput = container.querySelector('#search-name') as HTMLInputElement
+			const statusSelect = container.querySelector('#filter-status') as HTMLSelectElement
+			const roleSelect = container.querySelector('#filter-role') as HTMLSelectElement
 
 			async function runSearch(): Promise<void> {
 				const searchText = searchInput.value.toLowerCase().trim()
@@ -506,11 +506,11 @@ export function createShoppingCartDemo(): InteractiveDemoResult {
 			</div>
 		`,
 		init: (container, db) => {
-			const cartItemsEl = container.querySelector('#cart-items')!
-			const cartTotalEl = container.querySelector('#cart-total')!
-			const logEl = container.querySelector('#cart-log')!
-			const checkoutBtn = container.querySelector('#checkout-btn')!
-			const checkoutFailBtn = container.querySelector('#checkout-fail-btn')!
+			const cartItemsEl = container.querySelector('#cart-items') as HTMLElement
+			const cartTotalEl = container.querySelector('#cart-total') as HTMLElement
+			const logEl = container.querySelector('#cart-log') as HTMLElement
+			const checkoutBtn = container.querySelector('#checkout-btn') as HTMLButtonElement
+			const checkoutFailBtn = container.querySelector('#checkout-fail-btn') as HTMLButtonElement
 
 			interface CartItem {
 				id: string
@@ -732,15 +732,15 @@ db.<span class="function">onChange</span>((event) =&gt; {
 			</div>
 		`,
 		init: (container, db) => {
-			const feedEl = container.querySelector('#sync-event-feed')!
-			const localCountEl = container.querySelector('#local-event-count')!
-			const remoteCountEl = container.querySelector('#remote-event-count')!
-			const totalCountEl = container.querySelector('#total-event-count')!
-			const addBtn = container.querySelector('#sync-add-btn')!
-			const updateBtn = container.querySelector('#sync-update-btn')!
-			const deleteBtn = container.querySelector('#sync-delete-btn')!
-			const openTabBtn = container.querySelector('#open-new-tab')!
-			const logEl = container.querySelector('#sync-log')!
+			const feedEl = container.querySelector('#sync-event-feed') as HTMLElement
+			const localCountEl = container.querySelector('#local-event-count') as HTMLElement
+			const remoteCountEl = container.querySelector('#remote-event-count') as HTMLElement
+			const totalCountEl = container.querySelector('#total-event-count') as HTMLElement
+			const addBtn = container.querySelector('#sync-add-btn') as HTMLButtonElement
+			const updateBtn = container.querySelector('#sync-update-btn') as HTMLButtonElement
+			const deleteBtn = container.querySelector('#sync-delete-btn') as HTMLButtonElement
+			const openTabBtn = container.querySelector('#open-new-tab') as HTMLButtonElement
+			const logEl = container.querySelector('#sync-log') as HTMLElement
 
 			const store = db.store('users')
 			let localCount = 0
@@ -922,14 +922,14 @@ export function createDataExportDemo(): InteractiveDemoResult {
 			</div>
 		`,
 		init: (container, db) => {
-			const storeSelect = container.querySelector('#export-store')!
-			const formatSelect = container.querySelector('#export-format')!
-			const exportBtn = container.querySelector('#export-btn')!
-			const progressEl = container.querySelector('#export-progress')!
-			const progressFill = container.querySelector('#progress-fill')!
-			const progressText = container.querySelector('#progress-text')!
-			const previewEl = container.querySelector('#export-preview code')!
-			const logEl = container.querySelector('#export-log')!
+			const storeSelect = container.querySelector('#export-store') as HTMLSelectElement
+			const formatSelect = container.querySelector('#export-format') as HTMLSelectElement
+			const exportBtn = container.querySelector('#export-btn') as HTMLButtonElement
+			const progressEl = container.querySelector('#export-progress') as HTMLElement
+			const progressFill = container.querySelector('#progress-fill') as HTMLElement
+			const progressText = container.querySelector('#progress-text') as HTMLElement
+			const previewEl = container.querySelector('#export-preview code') as HTMLElement
+			const logEl = container.querySelector('#export-log') as HTMLElement
 
 			function log(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
 				const entry = document.createElement('div')
@@ -951,25 +951,19 @@ export function createDataExportDemo(): InteractiveDemoResult {
 
 				void (async() => {
 					try {
+						// First, get total count and all records in one go
+						// This avoids the transaction timeout issue with iterate()
 						const total = await store.count()
-						const records: unknown[] = []
-						let processed = 0
-
 						log(`Exporting ${total} records from "${storeName}"...`)
 						const startTime = performance.now()
 
-						for await (const record of store.iterate()) {
-							records.push(record)
-							processed++
+						// Use all() to get records in a single transaction
+						const records = await store.all()
+						const processed = records.length
 
-							const percent = Math.round((processed / total) * 100)
-							progressFill.style.width = `${percent}%`
-							progressText.textContent = `${processed} / ${total}`
-
-							if (processed % 2 === 0) {
-								await new Promise(r => setTimeout(r, 30))
-							}
-						}
+						// Update progress to 100%
+						progressFill.style.width = '100%'
+						progressText.textContent = `${processed} / ${total}`
 
 						const elapsed = Math.round(performance.now() - startTime)
 						log(`Completed: ${processed} records in ${elapsed}ms`, 'success')
@@ -981,10 +975,10 @@ export function createDataExportDemo(): InteractiveDemoResult {
 							if (records.length === 0) {
 								output = '(no data)'
 							} else {
-								const firstRecord = records[0] as Record<string, unknown>
+								const firstRecord = records[0] as unknown as Record<string, unknown>
 								const headers = Object.keys(firstRecord)
 								const rows = records.map(r => {
-									const rec = r as Record<string, unknown>
+									const rec = r as unknown as Record<string, unknown>
 									return headers.map(h => JSON.stringify(rec[h] ?? '')).join(',')
 								})
 								output = [headers.join(','), ...rows].join('\n')
@@ -1043,13 +1037,21 @@ const user = await store.index('byEmail').get('alice@example.com')</code></pre>
 			</div>
 		`,
 		init: (container, db) => {
-			const emailInput = container.querySelector('#lookup-email')!
-			const lookupBtn = container.querySelector('#lookup-btn')!
-			const resultEl = container.querySelector('#lookup-result')!
-			const statsEl = container.querySelector('#lookup-stats')!
-			const timeEl = container.querySelector('#lookup-time')!
+			const emailInput = container.querySelector('#lookup-email') as HTMLInputElement
+			const lookupBtn = container.querySelector('#lookup-btn') as HTMLButtonElement
+			const resultEl = container.querySelector('#lookup-result') as HTMLElement
+			const statsEl = container.querySelector('#lookup-stats') as HTMLElement
+			const timeEl = container.querySelector('#lookup-time') as HTMLElement
+			const datalist = container.querySelector('#email-suggestions') as HTMLDataListElement
 
-			const index = db.store('users').index('byEmail')
+			const store = db.store('users')
+			const index = store.index('byEmail')
+
+			// Populate email suggestions from existing data
+			void store.all().then((users) => {
+				const emails = users.slice(0, 10).map(u => u.email)
+				datalist.innerHTML = emails.map(email => `<option value="${email}">`).join('')
+			}).catch(() => { /* ignore */ })
 
 			function doLookup(): void {
 				const email = emailInput.value.trim()
@@ -1086,7 +1088,7 @@ const user = await store.index('byEmail').get('alice@example.com')</code></pre>
 							</div>
 						`
 					}
-				})
+				}).catch(() => { /* ignore */ })
 			}
 
 			lookupBtn.onclick = doLookup
@@ -1127,11 +1129,11 @@ export function createRegistrationDemo(): InteractiveDemoResult {
 			</div>
 		`,
 		init: (container, db) => {
-			const nameInput = container.querySelector('#reg-name')!
-			const emailInput = container.querySelector('#reg-email')!
-			const submitBtn = container.querySelector('#reg-submit')!
-			const resultEl = container.querySelector('#reg-result')!
-			const logEl = container.querySelector('#reg-log')!
+			const nameInput = container.querySelector('#reg-name') as HTMLInputElement
+			const emailInput = container.querySelector('#reg-email') as HTMLInputElement
+			const submitBtn = container.querySelector('#reg-submit') as HTMLButtonElement
+			const resultEl = container.querySelector('#reg-result') as HTMLElement
+			const logEl = container.querySelector('#reg-log') as HTMLElement
 
 			const store = db.store('users')
 
