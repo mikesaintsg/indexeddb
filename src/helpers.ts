@@ -500,3 +500,148 @@ export function promisifyCursorRequest<T extends IDBCursor | IDBCursorWithValue>
 		request.onerror = () => reject(wrapError(request.error))
 	})
 }
+
+// ============================================================================
+// IDBFactory Helpers
+// ============================================================================
+
+/**
+ * Lists all IndexedDB databases for this origin.
+ *
+ * @returns Promise resolving to an array of database info
+ *
+ * @remarks
+ * Returns the native `indexedDB.databases()` result.
+ * Returns an empty array if the browser doesn't support this API.
+ *
+ * @example
+ * ```ts
+ * const databases = await listDatabases()
+ * for (const db of databases) {
+ *   console.log(`${db.name} v${db.version}`)
+ * }
+ * ```
+ */
+export async function listDatabases(): Promise<readonly { name: string; version: number }[]> {
+	if (typeof indexedDB.databases !== 'function') {
+		return []
+	}
+	const databases = await indexedDB.databases()
+	return databases.map(db => ({
+		name: db.name ?? '',
+		version: db.version ?? 0,
+	}))
+}
+
+/**
+ * Compares two IndexedDB keys.
+ *
+ * @param first - First key to compare
+ * @param second - Second key to compare
+ * @returns -1 if first < second, 0 if equal, 1 if first > second
+ *
+ * @remarks
+ * Wraps the native `indexedDB.cmp()` function.
+ * Throws if either value is not a valid IndexedDB key.
+ *
+ * @example
+ * ```ts
+ * compareKeys('a', 'b')  // -1
+ * compareKeys('a', 'a')  // 0
+ * compareKeys('b', 'a')  // 1
+ *
+ * // For sorting
+ * keys.sort((a, b) => compareKeys(a, b))
+ * ```
+ */
+export function compareKeys(first: ValidKey, second: ValidKey): number {
+	return indexedDB.cmp(first, second)
+}
+
+// ============================================================================
+// Date Range Helpers
+// ============================================================================
+
+/**
+ * Creates an IDBKeyRange for dates within the last N days.
+ *
+ * @param days - Number of days to look back (must be between 0 and 3650)
+ * @returns IDBKeyRange from (now - days) to now
+ *
+ * @remarks
+ * Uses timestamp values (milliseconds since epoch).
+ * Store your dates as `Date.now()` or `new Date().getTime()` for compatibility.
+ *
+ * @example
+ * ```ts
+ * // Get posts from the last 7 days
+ * const range = lastDaysRange(7)
+ * const recentPosts = await store.all(range)
+ * ```
+ */
+export function lastDaysRange(days: number): IDBKeyRange {
+	if (days < 0 || days > 3650 || !Number.isInteger(days)) {
+		throw new Error('days must be an integer between 0 and 3650')
+	}
+	const now = Date.now()
+	const start = now - (days * 86400000) // 86400000 = 24 * 60 * 60 * 1000
+	return IDBKeyRange.bound(start, now)
+}
+
+/**
+ * Creates an IDBKeyRange for today only (midnight to end of day).
+ *
+ * @returns IDBKeyRange for today with exclusive upper bound
+ *
+ * @remarks
+ * Uses timestamp values (milliseconds since epoch).
+ * The upper bound is exclusive (start of next day).
+ *
+ * @example
+ * ```ts
+ * // Get today's entries
+ * const range = todayRange()
+ * const todayEntries = await store.all(range)
+ * ```
+ */
+export function todayRange(): IDBKeyRange {
+	const now = new Date()
+	const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+	const startOfNextDay = startOfDay + 86400000
+	return IDBKeyRange.bound(startOfDay, startOfNextDay, false, true)
+}
+
+/**
+ * Creates an IDBKeyRange for a custom date range.
+ *
+ * @param start - Start date (inclusive)
+ * @param end - End date (inclusive by default)
+ * @param options - Bound options (lowerOpen, upperOpen)
+ * @returns IDBKeyRange for the specified date range
+ *
+ * @remarks
+ * Accepts Date objects and converts them to timestamps.
+ * Uses timestamp values (milliseconds since epoch).
+ *
+ * @example
+ * ```ts
+ * // Get entries for Q1 2024
+ * const range = dateRange(
+ *   new Date('2024-01-01'),
+ *   new Date('2024-03-31T23:59:59.999')
+ * )
+ * const q1Entries = await store.all(range)
+ * ```
+ */
+export function dateRange(
+	start: Date,
+	end: Date,
+	options?: { readonly lowerOpen?: boolean; readonly upperOpen?: boolean },
+): IDBKeyRange {
+	return IDBKeyRange.bound(
+		start.getTime(),
+		end.getTime(),
+		options?.lowerOpen ?? false,
+		options?.upperOpen ?? false,
+	)
+}

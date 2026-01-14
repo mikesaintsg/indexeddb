@@ -36,6 +36,14 @@ export type ValidKey = IDBValidKey
 /** Valid IndexedDB key path */
 export type KeyPath = string | readonly string[]
 
+/** Database name and version info from listDatabases() */
+export interface DatabaseInfo {
+	/** Database name */
+	readonly name: string
+	/** Database version */
+	readonly version: number
+}
+
 // ============================================================================
 // Error Types
 // ============================================================================
@@ -1412,12 +1420,44 @@ export interface QueryBuilderInterface<T> {
 	filter(predicate: (value:  T) => boolean): QueryBuilderInterface<T>
 
 	/**
-	 * Set the result ordering.
+	 * Set the result ordering to ascending (default).
 	 *
-	 * @param direction - 'ascending' or 'descending'
 	 * @returns Query builder for chaining
+	 *
+	 * @remarks
+	 * Results are sorted in ascending key order. This is the default.
 	 */
-	orderBy(direction: OrderDirection): QueryBuilderInterface<T>
+	ascending(): QueryBuilderInterface<T>
+
+	/**
+	 * Set the result ordering to descending.
+	 *
+	 * @returns Query builder for chaining
+	 *
+	 * @remarks
+	 * Results are sorted in descending key order.
+	 */
+	descending(): QueryBuilderInterface<T>
+
+	/**
+	 * Get the underlying IDBKeyRange for this query.
+	 *
+	 * @returns The IDBKeyRange, or null if no range is set
+	 *
+	 * @remarks
+	 * Useful for introspection or passing to native APIs.
+	 * Returns null if the query uses anyOf() or only filters.
+	 *
+	 * @example
+	 * ```ts
+	 * const query = store.query().where('age').between(18, 65)
+	 * const range = query.getRange()
+	 * if (range?.includes(25)) {
+	 *   console.log('Age 25 is within range')
+	 * }
+	 * ```
+	 */
+	getRange(): IDBKeyRange | null
 
 	/**
 	 * Limit the number of results.
@@ -1588,6 +1628,48 @@ export interface WhereClauseInterface<T> {
 	 * Results are deduplicated by primary key.
 	 */
 	anyOf(values: readonly ValidKey[]): QueryBuilderInterface<T>
+
+	/**
+	 * Match records where key is NOT one of the given values.
+	 *
+	 * @param values - Array of values to exclude
+	 * @returns Query builder for chaining
+	 *
+	 * @remarks
+	 * **Performance:** This operation uses post-cursor filtering (O(n) table scan).
+	 * IndexedDB has no native "not in" operation. For better performance,
+	 * consider restructuring your data to use positive queries with `anyOf()`.
+	 *
+	 * @example
+	 * ```ts
+	 * // Exclude deleted and archived records (O(n) scan)
+	 * const active = await store.query()
+	 *   .where('status').noneOf(['deleted', 'archived'])
+	 *   .toArray()
+	 * ```
+	 */
+	noneOf(values: readonly ValidKey[]): QueryBuilderInterface<T>
+
+	/**
+	 * Match records where string key ends with suffix.
+	 *
+	 * @param suffix - String suffix to match
+	 * @returns Query builder for chaining
+	 *
+	 * @remarks
+	 * **Performance:** This operation uses post-cursor filtering (O(n) table scan).
+	 * IndexedDB cannot use indexes for suffix matching. For better performance,
+	 * consider storing a reversed version of the field and using `startsWith()`.
+	 *
+	 * @example
+	 * ```ts
+	 * // Find Gmail users (O(n) scan)
+	 * const gmailUsers = await store.query()
+	 *   .where('email').endsWith('@gmail.com')
+	 *   .toArray()
+	 * ```
+	 */
+	endsWith(suffix: string): QueryBuilderInterface<T>
 }
 
 // ============================================================================

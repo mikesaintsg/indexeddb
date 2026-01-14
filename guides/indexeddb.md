@@ -533,13 +533,48 @@ const activeGmailUsers = await store.query()
 	.toArray()
 ```
 
+### Filter-Based Where Methods (O(n))
+
+These methods use post-cursor filtering since IndexedDB has no native support:
+
+```typescript
+// endsWith - find by string suffix (O(n) scan)
+const gmailUsers = await store.query()
+	.where('email').endsWith('@gmail.com')
+	.toArray()
+
+// noneOf - exclude values (O(n) scan)
+const activeUsers = await store.query()
+	.where('status').noneOf(['deleted', 'archived'])
+	.toArray()
+```
+
+> **Performance Note:** These methods scan all records. For better performance, consider restructuring your data to use indexed queries.
+
 ### Ordering and Pagination
 
 ```typescript
-db.orderBy('ascending')   // Default
-.orderBy('descending')
-.limit(10)              // Maximum results
-.offset(20)             // Skip first N results
+query.ascending()   // Default - sort ascending by key
+query.descending()  // Sort descending by key
+query.limit(10)     // Maximum results
+query.offset(20)    // Skip first N results
+```
+
+### Range Introspection
+
+Get the underlying IDBKeyRange for advanced use cases:
+
+```typescript
+const query = store.query().where('age').between(18, 65)
+const range = query.getRange()
+
+if (range?.includes(25)) {
+	console.log('Age 25 is within range')
+}
+
+// Pass to native APIs
+const nativeStore = db.native.transaction(['users']).objectStore('users')
+const cursor = nativeStore.openCursor(range)
 ```
 
 ### Terminal Operations
@@ -1683,17 +1718,20 @@ Creates or opens a database connection.
 
 #### Methods
 
-| Method               | Returns                        | Description            |
-|----------------------|--------------------------------|------------------------|
-| `where(keyPath)`     | `WhereClauseInterface<T>`      | Add index filter       |
-| `filter(predicate)`  | `QueryBuilderInterface<T>`     | Add post-cursor filter |
-| `orderBy(direction)` | `QueryBuilderInterface<T>`     | Set ordering           |
-| `limit(count)`       | `QueryBuilderInterface<T>`     | Limit results          |
-| `offset(count)`      | `QueryBuilderInterface<T>`     | Skip results           |
-| `toArray()`          | `Promise<readonly T[]>`        | Execute, return all    |
-| `first()`            | `Promise<T \| undefined>`      | Execute, return first  |
-| `count()`            | `Promise<number>`              | Execute, return count  |
-| `keys()`             | `Promise<readonly ValidKey[]>` | Execute, return keys   |
+| Method              | Returns                        | Description               |
+|---------------------|--------------------------------|---------------------------|
+| `where(keyPath)`    | `WhereClauseInterface<T>`      | Add index filter          |
+| `filter(predicate)` | `QueryBuilderInterface<T>`     | Add post-cursor filter    |
+| `ascending()`       | `QueryBuilderInterface<T>`     | Sort ascending (default)  |
+| `descending()`      | `QueryBuilderInterface<T>`     | Sort descending           |
+| `limit(count)`      | `QueryBuilderInterface<T>`     | Limit results             |
+| `offset(count)`     | `QueryBuilderInterface<T>`     | Skip results              |
+| `getRange()`        | `IDBKeyRange \| null`          | Get underlying key range  |
+| `toArray()`         | `Promise<readonly T[]>`        | Execute, return all       |
+| `first()`           | `Promise<T \| undefined>`      | Execute, return first     |
+| `count()`           | `Promise<number>`              | Execute, return count     |
+| `keys()`            | `Promise<readonly ValidKey[]>` | Execute, return keys      |
+| `iterate()`         | `AsyncGenerator<T>`            | Memory-efficient iterator |
 | `iterate()`          | `AsyncGenerator<T>`            | Execute, iterate       |
 
 ---
@@ -1702,16 +1740,18 @@ Creates or opens a database connection.
 
 #### Methods
 
-| Method                            | Returns                    | Description      |
-|-----------------------------------|----------------------------|------------------|
-| `equals(value)`                   | `QueryBuilderInterface<T>` | Exact match      |
-| `greaterThan(value)`              | `QueryBuilderInterface<T>` | Greater than     |
-| `greaterThanOrEqual(value)`       | `QueryBuilderInterface<T>` | Greater or equal |
-| `lessThan(value)`                 | `QueryBuilderInterface<T>` | Less than        |
-| `lessThanOrEqual(value)`          | `QueryBuilderInterface<T>` | Less or equal    |
-| `between(lower, upper, options?)` | `QueryBuilderInterface<T>` | Range query      |
-| `startsWith(prefix)`              | `QueryBuilderInterface<T>` | String prefix    |
-| `anyOf(values)`                   | `QueryBuilderInterface<T>` | Multiple values  |
+| Method                            | Returns                    | Description                    |
+|-----------------------------------|----------------------------|--------------------------------|
+| `equals(value)`                   | `QueryBuilderInterface<T>` | Exact match                    |
+| `greaterThan(value)`              | `QueryBuilderInterface<T>` | Greater than                   |
+| `greaterThanOrEqual(value)`       | `QueryBuilderInterface<T>` | Greater or equal               |
+| `lessThan(value)`                 | `QueryBuilderInterface<T>` | Less than                      |
+| `lessThanOrEqual(value)`          | `QueryBuilderInterface<T>` | Less or equal                  |
+| `between(lower, upper, options?)` | `QueryBuilderInterface<T>` | Range query                    |
+| `startsWith(prefix)`              | `QueryBuilderInterface<T>` | String prefix                  |
+| `anyOf(values)`                   | `QueryBuilderInterface<T>` | Multiple values                |
+| `noneOf(values)`                  | `QueryBuilderInterface<T>` | Exclude values (O(n) filter)   |
+| `endsWith(suffix)`                | `QueryBuilderInterface<T>` | String suffix (O(n) filter)    |
 
 ---
 
@@ -1769,7 +1809,6 @@ type KeyPath = string | readonly string[]
 type TransactionMode = 'readonly' | 'readwrite'
 type TransactionDurability = 'default' | 'strict' | 'relaxed'
 type CursorDirection = 'next' | 'nextunique' | 'previous' | 'previousunique'
-type OrderDirection = 'ascending' | 'descending'
 type ChangeType = 'set' | 'add' | 'remove' | 'clear'
 type ChangeSource = 'local' | 'remote'
 type Unsubscribe = () => void
@@ -1794,6 +1833,67 @@ interface StorageEstimate {
 	readonly usage: number
 	readonly quota: number
 	readonly percentUsed: number
+}
+```
+
+---
+
+## Helper Functions
+
+The library exports several utility functions for common operations:
+
+### Database Management
+
+```typescript
+import { listDatabases, compareKeys } from '@mikesaintsg/indexeddb'
+
+// List all databases for this origin
+const databases = await listDatabases()
+for (const db of databases) {
+	console.log(`${db.name} v${db.version}`)
+}
+
+// Compare two IndexedDB keys
+compareKeys('a', 'b')  // -1
+compareKeys('a', 'a')  // 0
+compareKeys('b', 'a')  // 1
+
+// Sort keys
+keys.sort((a, b) => compareKeys(a, b))
+```
+
+### Date Range Helpers
+
+```typescript
+import { lastDaysRange, todayRange, dateRange } from '@mikesaintsg/indexeddb'
+
+// Get records from the last 7 days
+const range = lastDaysRange(7)
+const recentPosts = await store.all(range)
+
+// Get today's records only
+const todayPosts = await store.all(todayRange())
+
+// Custom date range (Q1 2024)
+const q1Range = dateRange(
+	new Date('2024-01-01'),
+	new Date('2024-03-31T23:59:59.999')
+)
+const q1Posts = await store.all(q1Range)
+```
+
+### IDBKeyRange Helpers
+
+```typescript
+import { startsWithRange, isKeyRange } from '@mikesaintsg/indexeddb'
+
+// Create a "starts with" range for string prefix queries
+const range = startsWithRange('Al')  // Matches 'Alice', 'Albert', etc.
+const results = await store.all(range)
+
+// Check if value is an IDBKeyRange
+if (isKeyRange(value)) {
+	// Use it with native APIs
 }
 ```
 

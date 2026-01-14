@@ -11,7 +11,6 @@
 import type {
 	QueryBuilderInterface,
 	WhereClauseInterface,
-	OrderDirection,
 	ValidKey,
 	BetweenOptions,
 } from '../types.js'
@@ -29,7 +28,7 @@ interface QueryState<T> {
 	/** Post-cursor filter predicates */
 	filters: readonly ((value: T) => boolean)[]
 	/** Sort direction */
-	direction: OrderDirection
+	direction: 'ascending' | 'descending'
 	/** Maximum results to return */
 	limitCount: number | null
 	/** Number of results to skip */
@@ -91,11 +90,22 @@ export class QueryBuilder<T> implements QueryBuilderInterface<T> {
 		})
 	}
 
-	orderBy(direction: OrderDirection): QueryBuilderInterface<T> {
+	ascending(): QueryBuilderInterface<T> {
 		return new QueryBuilder<T>(this.#context, {
 			...this.#state,
-			direction,
+			direction: 'ascending',
 		})
+	}
+
+	descending(): QueryBuilderInterface<T> {
+		return new QueryBuilder<T>(this.#context, {
+			...this.#state,
+			direction: 'descending',
+		})
+	}
+
+	getRange(): IDBKeyRange | null {
+		return this.#state.range
 	}
 
 	limit(count: number): QueryBuilderInterface<T> {
@@ -563,9 +573,75 @@ export class WhereClause<T> implements WhereClauseInterface<T> {
 	}
 
 	anyOf(values: readonly ValidKey[]): QueryBuilderInterface<T> {
+		// Optimize single value to use IDBKeyRange.only()
+		if (values.length === 1 && values[0] !== undefined) {
+			return new QueryBuilder<T>(this.#context, {
+				...this.#state,
+				range: IDBKeyRange.only(values[0]),
+			})
+		}
+
 		return new QueryBuilder<T>(this.#context, {
 			...this.#state,
 			anyOfValues: values,
 		})
+	}
+
+	noneOf(values: readonly ValidKey[]): QueryBuilderInterface<T> {
+		const keyPath = this.#state.keyPath
+		const valueSet = new Set(values.map(v => this.#keyToString(v)))
+
+		// Create a filter that excludes matching values
+		const filter = (item: T): boolean => {
+			if (keyPath === null || typeof item !== 'object' || item === null) {
+				return true
+			}
+			const fieldValue = (item as Record<string, unknown>)[keyPath]
+			if (!isValidKey(fieldValue)) {
+				return true
+			}
+			return !valueSet.has(this.#keyToString(fieldValue))
+		}
+
+		return new QueryBuilder<T>(this.#context, {
+			...this.#state,
+			keyPath: null, // Clear keyPath since we're not using index
+			filters: [...this.#state.filters, filter],
+		})
+	}
+
+	endsWith(suffix: string): QueryBuilderInterface<T> {
+		const keyPath = this.#state.keyPath
+
+		// Create a filter that checks suffix
+		const filter = (item: T): boolean => {
+			if (keyPath === null || typeof item !== 'object' || item === null) {
+				return false
+			}
+			const fieldValue = (item as Record<string, unknown>)[keyPath]
+			if (typeof fieldValue !== 'string') {
+				return false
+			}
+			return fieldValue.endsWith(suffix)
+		}
+
+		return new QueryBuilder<T>(this.#context, {
+			...this.#state,
+			keyPath: null, // Clear keyPath since we're not using index
+			filters: [...this.#state.filters, filter],
+		})
+	}
+
+	/**
+	 * Converts a key to a string for use as a Set key.
+	 */
+	#keyToString(key: ValidKey): string {
+		if (typeof key === 'string') return key
+		if (typeof key === 'number') return `n:${key}`
+		if (key instanceof Date) return `d:${key.getTime()}`
+		if (key instanceof ArrayBuffer) return `b:${Array.from(new Uint8Array(key)).join(',')}`
+		if (ArrayBuffer.isView(key)) return `b:${Array.from(new Uint8Array(key.buffer)).join(',')}`
+		if (Array.isArray(key)) return `a:${JSON.stringify(key)}`
+		return JSON.stringify(key)
 	}
 }

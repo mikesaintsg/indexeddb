@@ -35,6 +35,11 @@ import {
 	fromIDBCursorDirection,
 	isCursor,
 	isCursorWithValue,
+	listDatabases,
+	compareKeys,
+	lastDaysRange,
+	todayRange,
+	dateRange,
 } from '../src/helpers.js'
 
 // ============================================================================
@@ -758,5 +763,137 @@ describe('isCursorWithValue', () => {
 			direction: 'next',
 		}
 		expect(isCursorWithValue(cursorLike)).toBe(false)
+	})
+})
+
+// ============================================================================
+// IDBFactory Helpers
+// ============================================================================
+
+describe('listDatabases', () => {
+	it('returns an array', async() => {
+		const databases = await listDatabases()
+		expect(Array.isArray(databases)).toBe(true)
+	})
+
+	it('returns database info objects with name and version', async() => {
+		const databases = await listDatabases()
+		for (const db of databases) {
+			expect(typeof db.name).toBe('string')
+			expect(typeof db.version).toBe('number')
+		}
+	})
+})
+
+describe('compareKeys', () => {
+	it('returns -1 when first < second', () => {
+		expect(compareKeys('a', 'b')).toBe(-1)
+		expect(compareKeys(1, 2)).toBe(-1)
+	})
+
+	it('returns 0 when keys are equal', () => {
+		expect(compareKeys('a', 'a')).toBe(0)
+		expect(compareKeys(42, 42)).toBe(0)
+	})
+
+	it('returns 1 when first > second', () => {
+		expect(compareKeys('b', 'a')).toBe(1)
+		expect(compareKeys(2, 1)).toBe(1)
+	})
+
+	it('works with arrays', () => {
+		expect(compareKeys(['a', 1], ['a', 2])).toBe(-1)
+		expect(compareKeys(['a', 2], ['a', 1])).toBe(1)
+		expect(compareKeys(['a', 1], ['a', 1])).toBe(0)
+	})
+
+	it('works with dates', () => {
+		const earlier = new Date('2024-01-01')
+		const later = new Date('2024-12-31')
+		expect(compareKeys(earlier, later)).toBe(-1)
+		expect(compareKeys(later, earlier)).toBe(1)
+		expect(compareKeys(earlier, new Date('2024-01-01'))).toBe(0)
+	})
+})
+
+// ============================================================================
+// Date Range Helpers
+// ============================================================================
+
+describe('lastDaysRange', () => {
+	it('creates a range for the last N days', () => {
+		const range = lastDaysRange(7)
+		expect(range).toBeInstanceOf(IDBKeyRange)
+
+		const now = Date.now()
+		const weekAgo = now - (7 * 86400000)
+
+		expect(range.includes(now)).toBe(true)
+		expect(range.includes(weekAgo)).toBe(true)
+		expect(range.includes(weekAgo - 1)).toBe(false)
+	})
+
+	it('throws for negative days', () => {
+		expect(() => lastDaysRange(-1)).toThrow('days must be an integer between 0 and 3650')
+	})
+
+	it('throws for days > 3650', () => {
+		expect(() => lastDaysRange(3651)).toThrow('days must be an integer between 0 and 3650')
+	})
+
+	it('throws for non-integer days', () => {
+		expect(() => lastDaysRange(1.5)).toThrow('days must be an integer between 0 and 3650')
+	})
+
+	it('handles 0 days (today only)', () => {
+		const range = lastDaysRange(0)
+		const now = Date.now()
+		expect(range.includes(now)).toBe(true)
+	})
+})
+
+describe('todayRange', () => {
+	it('creates a range for today', () => {
+		const range = todayRange()
+		expect(range).toBeInstanceOf(IDBKeyRange)
+
+		const now = Date.now()
+		expect(range.includes(now)).toBe(true)
+	})
+
+	it('excludes yesterday', () => {
+		const range = todayRange()
+		const yesterday = Date.now() - 86400000
+		expect(range.includes(yesterday)).toBe(false)
+	})
+})
+
+describe('dateRange', () => {
+	it('creates a range between two dates', () => {
+		const start = new Date('2024-01-01')
+		const end = new Date('2024-12-31')
+		const range = dateRange(start, end)
+
+		expect(range).toBeInstanceOf(IDBKeyRange)
+		expect(range.includes(new Date('2024-06-15').getTime())).toBe(true)
+		expect(range.includes(new Date('2023-12-31').getTime())).toBe(false)
+	})
+
+	it('respects lowerOpen option', () => {
+		const start = new Date('2024-01-01')
+		const end = new Date('2024-12-31')
+		const range = dateRange(start, end, { lowerOpen: true })
+
+		expect(range.includes(start.getTime())).toBe(false)
+		expect(range.includes(start.getTime() + 1)).toBe(true)
+	})
+
+	it('respects upperOpen option', () => {
+		const start = new Date('2024-01-01')
+		const end = new Date('2024-12-31')
+		const range = dateRange(start, end, { upperOpen: true })
+
+		expect(range.includes(end.getTime())).toBe(false)
+		expect(range.includes(end.getTime() - 1)).toBe(true)
 	})
 })

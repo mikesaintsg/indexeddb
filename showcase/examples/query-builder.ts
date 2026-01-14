@@ -248,7 +248,7 @@ const results = await store.query()
 }
 
 /**
- * Demonstrates orderBy() and pagination
+ * Demonstrates ascending(), descending() and pagination
  */
 export async function demonstrateOrderingAndPagination(db: DatabaseInterface<AppSchema>): Promise<ExampleResult> {
 	const store = db.store('users')
@@ -256,13 +256,13 @@ export async function demonstrateOrderingAndPagination(db: DatabaseInterface<App
 	// Ascending order (default)
 	const ascending = await store.query()
 		.where('byAge').greaterThanOrEqual(0)
-		.orderBy('ascending')
+		.ascending()
 		.toArray()
 
 	// Descending order
 	const descending = await store.query()
 		.where('byAge').greaterThanOrEqual(0)
-		.orderBy('descending')
+		.descending()
 		.toArray()
 
 	// Pagination
@@ -278,10 +278,10 @@ export async function demonstrateOrderingAndPagination(db: DatabaseInterface<App
 
 	return {
 		success: true,
-		message: 'orderBy() and limit/offset pagination',
+		message: 'ascending(), descending() and limit/offset pagination',
 		data: {
-			ascending: ascending.map(u => ({ name: u.name, age: u.age })),
-			descending: descending.map(u => ({ name: u.name, age: u.age })),
+			ascending: ascending.map((u: { name: string; age: number }) => ({ name: u.name, age: u.age })),
+			descending: descending.map((u: { name: string; age: number }) => ({ name: u.name, age: u.age })),
 			page1: page1.map(u => u.name),
 			page2: page2.map(u => u.name),
 		},
@@ -289,12 +289,12 @@ export async function demonstrateOrderingAndPagination(db: DatabaseInterface<App
 // Ascending order (default)
 const ascending = await store.query()
   .where('byAge').greaterThanOrEqual(0)
-  .orderBy('ascending')
+  .ascending()
   .toArray()
 
 // Descending order
 const descending = await store.query()
-  .orderBy('descending')
+  .descending()
   .toArray()
 
 // Pagination

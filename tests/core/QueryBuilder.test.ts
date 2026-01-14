@@ -469,6 +469,122 @@ describe('QueryBuilder', () => {
 
 			expect(results).toHaveLength(0)
 		})
+
+		it('optimizes single value to use IDBKeyRange.only()', async() => {
+			await db.store('users').set([
+				{ id: 'u1', name: 'Alice', email: 'alice@test.com', age: 25, status: 'active' },
+				{ id: 'u2', name: 'Bob', email: 'bob@test.com', age: 30, status: 'active' },
+			])
+
+			// Single value should work like equals()
+			const results = await db.store('users').query()
+				.where('byName').anyOf(['Alice'])
+				.toArray()
+
+			expect(results).toHaveLength(1)
+			expect(results[0]?.name).toBe('Alice')
+		})
+	})
+
+	// ─── Where Clause: noneOf ────────────────────────────────
+
+	describe('where().noneOf()', () => {
+		it('excludes given values (O(n) filter)', async() => {
+			await db.store('users').set([
+				{ id: 'u1', name: 'Alice', email: 'alice@test.com', age: 25, status: 'active' },
+				{ id: 'u2', name: 'Bob', email: 'bob@test.com', age: 30, status: 'inactive' },
+				{ id: 'u3', name: 'Charlie', email: 'charlie@test.com', age: 35, status: 'inactive' },
+			])
+
+			const results = await db.store('users').query()
+				.where('status').noneOf(['inactive'])
+				.toArray()
+
+			expect(results).toHaveLength(1)
+			expect(results[0]?.name).toBe('Alice')
+		})
+
+		it('returns all if values array is empty', async() => {
+			await db.store('users').set([
+				{ id: 'u1', name: 'Alice', email: 'alice@test.com', age: 25, status: 'active' },
+				{ id: 'u2', name: 'Bob', email: 'bob@test.com', age: 30, status: 'inactive' },
+			])
+
+			const results = await db.store('users').query()
+				.where('status').noneOf([])
+				.toArray()
+
+			expect(results).toHaveLength(2)
+		})
+	})
+
+	// ─── Where Clause: endsWith ──────────────────────────────
+
+	describe('where().endsWith()', () => {
+		it('matches string suffix (O(n) filter)', async() => {
+			await db.store('users').set([
+				{ id: 'u1', name: 'Alice', email: 'alice@gmail.com', age: 25, status: 'active' },
+				{ id: 'u2', name: 'Bob', email: 'bob@test.com', age: 30, status: 'active' },
+				{ id: 'u3', name: 'Charlie', email: 'charlie@gmail.com', age: 35, status: 'active' },
+			])
+
+			const results = await db.store('users').query()
+				.where('email').endsWith('@gmail.com')
+				.toArray()
+
+			expect(results).toHaveLength(2)
+			expect(results.map(r => r.name).sort()).toEqual(['Alice', 'Charlie'])
+		})
+
+		it('returns empty when no matches', async() => {
+			await db.store('users').set([
+				{ id: 'u1', name: 'Alice', email: 'alice@test.com', age: 25, status: 'active' },
+			])
+
+			const results = await db.store('users').query()
+				.where('email').endsWith('@gmail.com')
+				.toArray()
+
+			expect(results).toHaveLength(0)
+		})
+	})
+
+	// ─── getRange() ──────────────────────────────────────────
+
+	describe('getRange()', () => {
+		it('returns null for queries without range', () => {
+			const range = db.store('users').query().getRange()
+			expect(range).toBeNull()
+		})
+
+		it('returns IDBKeyRange for equals()', () => {
+			const range = db.store('users').query()
+				.where('byName').equals('Alice')
+				.getRange()
+
+			expect(range).not.toBeNull()
+			expect(range?.includes('Alice')).toBe(true)
+			expect(range?.includes('Bob')).toBe(false)
+		})
+
+		it('returns IDBKeyRange for between()', () => {
+			const range = db.store('users').query()
+				.where('byAge').between(18, 65)
+				.getRange()
+
+			expect(range).not.toBeNull()
+			expect(range?.includes(25)).toBe(true)
+			expect(range?.includes(10)).toBe(false)
+			expect(range?.includes(70)).toBe(false)
+		})
+
+		it('returns null for filter-only queries', () => {
+			const range = db.store('users').query()
+				.filter(u => u.age > 18)
+				.getRange()
+
+			expect(range).toBeNull()
+		})
 	})
 
 	// ─── filter() ────────────────────────────────────────────
@@ -518,9 +634,9 @@ describe('QueryBuilder', () => {
 		})
 	})
 
-	// ─── orderBy() ───────────────────────────────────────────
+	// ─── ascending() / descending() ─────────────────────────
 
-	describe('orderBy()', () => {
+	describe('ascending() / descending()', () => {
 		it('orders ascending by default', async() => {
 			await db.store('users').set([
 				{ id: 'u3', name: 'Charlie', email: 'charlie@test.com', age: 35, status: 'active' },
@@ -529,7 +645,7 @@ describe('QueryBuilder', () => {
 			])
 
 			const results = await db.store('users').query()
-				.orderBy('ascending')
+				.ascending()
 				.toArray()
 
 			expect(results[0]?.id).toBe('u1')
@@ -545,7 +661,7 @@ describe('QueryBuilder', () => {
 			])
 
 			const results = await db.store('users').query()
-				.orderBy('descending')
+				.descending()
 				.toArray()
 
 			expect(results[0]?.id).toBe('u3')
@@ -676,7 +792,7 @@ describe('QueryBuilder', () => {
 
 			const results = await db.store('users').query()
 				.filter(u => u.email.endsWith('@gmail.com'))
-				.orderBy('descending')
+				.descending()
 				.toArray()
 
 			expect(results).toHaveLength(2)
