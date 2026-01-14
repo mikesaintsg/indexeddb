@@ -260,21 +260,101 @@ TypeScript's type system enforces interface contracts at compile time, making ab
 
 ### Method Prefix Categories
 
-| Category         | Prefix                               | Return Type    | Purpose                |
-|------------------|--------------------------------------|----------------|------------------------|
-| **Accessors**    | `get`, `peek`, `at`                  | any            | Retrieve values (pure) |
-|                  | `has`, `is`                          | boolean        | Check existence/state  |
-| **Mutators**     | `set`, `update`                      | void/this      | Assign or modify       |
-|                  | `append`, `prepend`, `insert`        | void/this      | Add elements           |
-|                  | `remove`, `delete`, `clear`          | void/this      | Remove elements        |
-| **Transformers** | `to`, `as`, `map`, `filter`, `clone` | new instance   | Transform (pure)       |
-| **Constructors** | `from`, `of`, `create`               | instance       | Factory functions      |
-| **Commands**     | `run`, `exec`, `apply`, `compute`    | result         | Execute operations     |
-|                  | `validate`, `check`                  | boolean/result | Verify correctness     |
-| **Lifecycle**    | `init`, `load`, `save`, `reset`      | void/any       | State management       |
-|                  | `close`, `destroy`                   | void           | Cleanup resources      |
-| **Events**       | `on`                                 | Unsubscribe fn | Event subscription     |
-| **Async**        | `waitFor`, `schedule`, `ensure`      | Promise        | Async operations       |
+| Category         | Prefix                               | Return Type          | Purpose                    |
+|------------------|--------------------------------------|----------------------|----------------------------|
+| **Accessors**    | `get`, `peek`, `at`                  | `T \| undefined`     | Optional lookup (may fail) |
+|                  | `resolve`                            | `T` (throws)         | Required lookup (must exist) |
+|                  | `has`, `is`                          | boolean              | Check existence/state      |
+|                  | `all`, `keys`, `entries`             | readonly collection  | Bulk retrieval             |
+| **Mutators**     | `set`, `update`                      | void/this            | Assign or modify           |
+|                  | `add`, `create`                      | void/instance        | Insert new (accepts arrays) |
+|                  | `append`, `prepend`, `insert`        | void/this            | Add elements               |
+|                  | `remove`, `clear`                    | void/this            | Remove elements            |
+| **Transformers** | `to`, `as`, `map`, `filter`, `clone` | new instance         | Transform (pure)           |
+| **Constructors** | `from`, `of`, `create`               | instance             | Factory functions          |
+| **Commands**     | `run`, `exec`, `apply`, `compute`    | result               | Execute operations         |
+|                  | `validate`, `check`                  | boolean/result       | Verify correctness         |
+| **Lifecycle**    | `init`, `load`, `save`, `reset`      | void/any             | State management           |
+|                  | `close`                              | void                 | Close connections          |
+|                  | `destroy`                            | void                 | Destroy entire resource    |
+|                  | `drop`                               | void/Promise         | Delete table/store         |
+| **Events**       | `on`                                 | Unsubscribe fn       | Event subscription         |
+| **Async**        | `waitFor`, `schedule`, `ensure`      | Promise              | Async operations           |
+
+### Accessor Semantics: `get` vs `resolve`
+
+The distinction between `get` and `resolve` is critical for expressing intent:
+
+| Method      | Returns            | When Item Missing        | Use When                        |
+|-------------|--------------------|--------------------------|---------------------------------|
+| `get(key)`  | `T \| undefined`   | Returns `undefined`      | Lookup is optional, check result |
+| `resolve(key)` | `T`             | Throws `NotFoundError`   | Item must exist, handle error   |
+
+```typescript
+// get() — Optional lookup, caller checks result
+const user = await store.get('u1')
+if (user) {
+	console.log(user.name)
+}
+
+// resolve() — Required lookup, throws if missing
+try {
+	const user = await store.resolve('u1')
+	console.log(user.name) // Safe - would have thrown
+} catch (error) {
+	if (isNotFoundError(error)) {
+		console.log(`User ${error.key} not found`)
+	}
+}
+```
+
+### Batch Operations: Array Overloads, Not Separate Methods
+
+**Do NOT create separate methods for batch operations.** Methods should accept both single values and arrays:
+
+```typescript
+// ✅ Single method handles both cases
+await store.set(user)                    // Single value
+await store.set([user1, user2, user3])   // Array of values
+
+await store.get('u1')                    // Single key
+await store.get(['u1', 'u2', 'u3'])      // Array of keys
+
+// ❌ DO NOT create separate batch methods
+await store.setMany(users)               // Wrong
+await store.createBatch(items)           // Wrong
+await store.executeBatch(operations)     // Wrong
+```
+
+Implementation pattern:
+
+```typescript
+async set(value: T | readonly T[], key?: ValidKey): Promise<ValidKey | readonly ValidKey[]> {
+	if (Array.isArray(value)) {
+		return this.#batchSet(value)
+	}
+	return this.#singleSet(value, key)
+}
+```
+
+### Database Lifecycle Terminology
+
+| Method      | Purpose                              | Example                     |
+|-------------|--------------------------------------|-----------------------------|
+| `close()`   | Close connection (can reopen)        | `db.close()`                |
+| `drop()`    | Delete a table/store                 | `await db.drop('users')`    |
+| `destroy()` | Destroy entire database              | `await db.destroy()`        |
+
+### Bulk Retrieval: Use `all()` Not `getAll()`
+
+```typescript
+// ✅ Correct
+const users = await store.all()
+const keys = await store.keys()
+
+// ❌ Wrong
+const users = await store.getAll()
+```
 
 ### Naming Rules
 
@@ -335,6 +415,59 @@ TypeScript's type system enforces interface contracts at compile time, making ab
 | `src/constants.ts` | Immutable shared constants                          |
 | `src/factories.ts` | Factory functions for creating instances            |
 | `src/index.ts`     | Barrel exports (no logic)                           |
+
+### CRITICAL: No Internal Definitions in Implementation Files
+
+**Implementation files (`src/core/[domain]/*.ts`) should ONLY contain:**
+- Class implementations
+- Private methods and fields using `#`
+- Imports from centralized files
+
+**Implementation files must NOT contain:**
+- ❌ Interface definitions (even if only used by that file)
+- ❌ Type aliases or type helpers
+- ❌ Constants (even if only used by that file)
+- ❌ Helper functions (even if only used by that file)
+- ❌ Type guards
+
+**ALWAYS extract to the appropriate centralized file:**
+
+| What                              | Extract To         | Even If                         |
+|-----------------------------------|--------------------|---------------------------------|
+| Interfaces, types, type aliases   | `src/types.ts`     | Only used in one file           |
+| Pure helper functions             | `src/helpers.ts`   | Only used in one file           |
+| Type guards                       | `src/helpers.ts`   | Only used in one file           |
+| Constants, error messages         | `src/constants.ts` | Only used in one file           |
+| Factory functions                 | `src/factories.ts` | Only create one type of thing   |
+
+```typescript
+// ❌ WRONG: Internal type in implementation file
+// src/core/database/Database.ts
+interface InternalCacheEntry {
+	readonly key: string
+	readonly value: unknown
+	readonly expiresAt: number
+}
+
+class Database {
+	#cache = new Map<string, InternalCacheEntry>()
+}
+
+// ✅ CORRECT: Type extracted to types.ts
+// src/types.ts
+export interface CacheEntry {
+	readonly key: string
+	readonly value: unknown
+	readonly expiresAt: number
+}
+
+// src/core/database/Database.ts
+import type { CacheEntry } from '../../types.js'
+
+class Database {
+	#cache = new Map<string, CacheEntry>()
+}
+```
 
 ### Barrel Export Pattern
 
@@ -570,17 +703,42 @@ export interface SystemInterface extends SystemSubscriptions {
 
 ### Result Pattern
 
+The Result pattern is useful for **external operations outside your control** where you want to catch errors without throwing. **Do not use Result for methods within your control** — use `get` (returns undefined) or `resolve` (throws) semantics instead.
+
+**When to use Result pattern:**
+- External API calls (fetch, third-party services)
+- Parsing untrusted input
+- Operations that may fail for unpredictable reasons
+
+**When NOT to use Result pattern:**
+- Database lookups within your control → use `get`/`resolve` semantics
+- Internal operations → throw appropriate error types
+
 ```typescript
+// ✅ Good: Result for external operations
 type Result<T, E = Error> =
 	| { readonly ok: true; readonly value: T }
 	| { readonly ok: false; readonly error: E }
 
-function divide(a: number, b: number): Result<number> {
-	if (b === 0) {
-		return { ok: false, error: new Error('Division by zero') }
+async function fetchUserFromAPI(id: string): Promise<Result<User>> {
+	try {
+		const response = await fetch(`/api/users/${id}`)
+		if (!response.ok) {
+			return { ok: false, error: new Error(`HTTP ${response.status}`) }
+		}
+		const user = await response.json()
+		return { ok: true, value: user }
+	} catch (error) {
+		return { ok: false, error: error instanceof Error ? error : new Error('Unknown') }
 	}
-	return { ok: true, value: a / b }
 }
+
+// ❌ Wrong: Don't use Result for internal lookups
+function getUser(id: string): Result<User> { /* Wrong approach */ }
+
+// ✅ Correct: Use get/resolve semantics for internal lookups
+function get(id: string): User | undefined { /* Returns undefined if not found */ }
+async function resolve(id: string): Promise<User> { /* Throws NotFoundError if not found */ }
 ```
 
 ### Event Subscription Pattern
@@ -726,7 +884,7 @@ export function createMockElement(): HTMLElement {
 
 ### Full TSDoc Example
 
-````typescript
+`````typescript
 /**
  * Validates an object against a shape of property guards.
  *
@@ -749,13 +907,14 @@ export function objectOf<T>(
 ): Guard<T> {
 	// Implementation
 }
-````
+`````
 
 ### Documentation Rules
 
 - Do not include type annotations in JSDoc; rely on TypeScript types
 - Keep examples copy-pasteable
 - Use `ts` fences for code examples
+- When wrapping TSDoc examples that contain backticks, use at least 5 backticks for the outer fence
 - Avoid leaking secrets or large payloads in previews
 - For options objects, list fields under `@remarks` (TSDoc doesn't support dotted `@param`)
 
@@ -775,7 +934,7 @@ Unused parameters, fields, and methods were created for a reason. The correct re
 2. **THINK** — Why was this created? What was the original intent?
 3. **SEARCH** — Check `types.ts` and related interfaces
 4. **IMPLEMENT** — Wire up the symbol to fulfill its purpose
-5. **ANNOTATE** — If implementation is blocked, add `@copilot.keep` annotation
+5. **DOCUMENT** — If implementation is blocked, add a descriptive TODO comment
 
 ### Protection Strategies
 
@@ -788,23 +947,34 @@ export interface SessionState {
 }
 ```
 
-**Layer 2: `@copilot.keep` Annotation**
+**Layer 2: Descriptive TODO Comments**
+
+When a symbol cannot be implemented yet, use a clear TODO comment explaining:
+- **What** the symbol is for
+- **Why** it's not implemented yet
+- **When** it should be revisited
+
 ```typescript
-/// @copilot.keep
-/// @copilot.reason "Parameter reserved for multi-tenant auth expansion"
-/// @copilot.status "pending-implementation"
 function createSession(userId: string, tenantId?: string): SessionInterface {
-	// TODO: Implement tenantId when multi-tenant feature ships
+	// TODO: [Multi-tenant Auth] Implement tenantId parameter for tenant isolation
+	// Reserved for multi-tenant auth feature (see PLAN.md Phase 4)
+	// Should store tenantId in session and use for permission scoping
 	return { id: crypto.randomUUID(), userId }
+}
+
+interface DatabaseOptions {
+	readonly name: string
+	// TODO: [Encryption] Add encryption key support for encrypted storage
+	// Will be implemented when IndexedDB encryption feature is added
+	readonly encryptionKey?: string
 }
 ```
 
-### Annotation Format
+### TODO Comment Format
 
 ```typescript
-/// @copilot.keep
-/// @copilot.reason "Human-readable explanation"
-/// @copilot.status "pending-implementation" | "internal-api" | "reserved" | "future-feature"
+// TODO: [Feature/Context] Brief description of intended purpose
+// Additional context: when to implement, dependencies, related issues
 ```
 
 ### Decision Tree
@@ -816,7 +986,7 @@ Unused symbol detected
 │  ├─ YES → Implement it
 │  └─ NO → Continue
 │
-├─ Does it have @copilot.keep annotation?
+├─ Does it have a TODO comment explaining its purpose?
 │  ├─ YES → Preserve it, check if ready to implement
 │  └─ NO → Continue
 │
@@ -825,8 +995,7 @@ Unused symbol detected
 │  └─ NO → Continue
 │
 └─ After exhausting all options:
-   ├─ Add @copilot.keep annotation
-   └─ Leave TODO comment asking for clarification
+   └─ Add TODO comment explaining purpose and asking for clarification
 ```
 
 ---
@@ -878,19 +1047,31 @@ npm test         # Unit tests
 - Add and update mirrored tests alongside implementation
 - Respect strict typing: no `any`, no `!`, no unsafe `as`
 - Keep ESM-only imports/exports with `.js` extensions
-- Follow TSDoc policy with `ts` examples
+- Follow TSDoc policy with `ts` examples (use 5+ backticks for nested code blocks)
 - Use `it.todo()` for unimplemented tests
 - Follow canonical prefix taxonomy for method names
 - Organize methods in standard order
 - Use Playwright for browser tests
+- Use `get` for optional lookups (returns undefined), `resolve` for required (throws)
+- Use `all()` instead of `getAll()` for bulk retrieval
+- Methods that accept single values should also accept arrays (no separate batch methods)
+- Use `close()` for connections, `drop()` for tables, `destroy()` for entire resources
 
 ### Symbol Preservation
 
 - **NEVER** remove parameters, fields, or methods to satisfy linters
-- **ALWAYS** implement unused symbols or annotate with `@copilot.keep`
+- **ALWAYS** implement unused symbols or add descriptive TODO comments
 - **CHECK** `types.ts` for contracts before claiming something is unused
 - **SEARCH** for original intent before removing any symbol
 - **ASK** for clarification if intent is unclear
+
+### Extraction Discipline
+
+- **NEVER** define types, interfaces, or type aliases in implementation files
+- **ALWAYS** extract types to `src/types.ts`, even if only used in one file
+- **ALWAYS** extract helper functions to `src/helpers.ts`
+- **ALWAYS** extract constants to `src/constants.ts`
+- Implementation files (`src/core/[domain]/`) contain ONLY class implementations
 
 ### Communication Style
 
