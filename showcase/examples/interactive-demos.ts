@@ -39,7 +39,8 @@ export interface InteractiveDemoResult {
 function getElement<T extends HTMLElement>(container: HTMLElement, selector: string): T {
 	const element = container.querySelector<T>(selector)
 	if (!element) {
-		throw new Error(`Element not found: ${selector}`)
+		const containerId = container.id ? `#${container.id}` : ''
+		throw new Error(`Element not found: ${selector} in ${container.tagName.toLowerCase()}${containerId}`)
 	}
 	return element
 }
