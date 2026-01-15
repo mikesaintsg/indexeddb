@@ -1,21 +1,8 @@
 /**
- * IndexedDB Wrapper Library Type Definitions
+ * @mikesaintsg/indexeddb
  *
- * SOURCE OF TRUTH for all public types and interfaces.
- *
- * @remarks
- * Design principles:
- * - No `any` types
- * - `readonly` by default for public outputs
- * - Simple returns:  `get()` returns `T | undefined`, not Result wrapper
- * - Exceptions for infrastructure errors
- * - `get()` returns undefined for missing; `resolve()` throws
- * - Overloads for unified single/array methods
- * - Explicit naming (no abbreviations except ID, URL, API, HTML, DOM, CSS, JSON, UUID, ARIA)
- * - Sensible defaults (`keyPath:  'id'`, `autoIncrement: false`)
- * - Direct native access via `.native` property
- *
- * @packageDocumentation
+ * Type definitions for the IndexedDB library. 
+ * All public types and interfaces are defined here as the SOURCE OF TRUTH.
  */
 
 // ============================================================================
@@ -27,8 +14,12 @@ export type Unsubscribe = () => void
 
 /** Converts subscription methods to hook callbacks for options */
 export type SubscriptionToHook<T> = {
-	[K in keyof T]?: T[K] extends (callback: infer CB) => Unsubscribe ?  CB : never
+	[K in keyof T]?: T[K] extends (callback: infer CB) => Unsubscribe ? CB : never
 }
+
+// ============================================================================
+// Key Types
+// ============================================================================
 
 /** Valid IndexedDB key types */
 export type ValidKey = IDBValidKey
@@ -36,73 +27,84 @@ export type ValidKey = IDBValidKey
 /** Valid IndexedDB key path */
 export type KeyPath = string | readonly string[]
 
+// ============================================================================
+// Database Info
+// ============================================================================
+
 /** Database name and version info from listDatabases() */
 export interface DatabaseInfo {
-	/** Database name */
 	readonly name: string
-	/** Database version */
-	readonly version: number
+	readonly version:  number
 }
 
 // ============================================================================
 // Error Types
 // ============================================================================
 
-/** Error codes for database operations */
+/** Database error codes */
 export type DatabaseErrorCode =
-	| 'OPEN_FAILED'
-	| 'UPGRADE_FAILED'
-	| 'UPGRADE_BLOCKED'
-	| 'TRANSACTION_ABORTED'
-	| 'TRANSACTION_INACTIVE'
-	| 'CONSTRAINT_ERROR'
-	| 'QUOTA_EXCEEDED'
 	| 'NOT_FOUND'
-	| 'DATA_ERROR'
+	| 'CONSTRAINT'
+	| 'DATA'
+	| 'TRANSACTION_INACTIVE'
 	| 'READ_ONLY'
-	| 'VERSION_ERROR'
-	| 'INVALID_STATE'
+	| 'VERSION'
+	| 'ABORT'
 	| 'TIMEOUT'
-	| 'UNKNOWN_ERROR'
+	| 'QUOTA_EXCEEDED'
+	| 'UNKNOWN'
+	| 'INVALID_STATE'
+	| 'INVALID_ACCESS'
+
+/** Base database error interface */
+export interface DatabaseErrorData {
+	readonly code: DatabaseErrorCode
+	readonly storeName?: string
+	readonly key?: ValidKey
+	readonly cause?: Error
+}
 
 // ============================================================================
 // Schema Types
 // ============================================================================
 
-/** Base constraint for database schema (record types mapped by store name) */
+/** Database schema type constraint */
 export type DatabaseSchema = Record<string, unknown>
 
 /** Index definition for an object store */
 export interface IndexDefinition {
 	readonly name: string
-	readonly keyPath: KeyPath
-	readonly unique?:  boolean
+	readonly keyPath:  KeyPath
+	readonly unique?: boolean
 	readonly multiEntry?: boolean
 }
 
-/**
- * Object store definition.
- *
- * @remarks
- * Defaults:
- * - `keyPath`: `'id'`
- * - `autoIncrement`: `false`
- * - `indexes`: `[]`
- *
- * Use `keyPath:  null` for out-of-line keys.
- */
+/** TTL options for automatic expiration */
+export interface TTLOptions {
+	/**
+	 * Field that stores expiration timestamp. 
+	 * If not specified, internal `_expiresAt` field is used.
+	 */
+	readonly field?: string
+	/**
+	 * Default TTL in milliseconds.
+	 * Individual records can override via SetOptions.
+	 */
+	readonly defaultMs?: number
+}
+
+/** Store definition for schema */
 export interface StoreDefinition {
-	/** Key path for in-line keys.  Use `null` for out-of-line keys.  @defaultValue `'id'` */
-	readonly keyPath?: KeyPath | null
-	/** Whether the store uses auto-incrementing keys. @defaultValue `false` */
+	readonly keyPath?:  KeyPath
 	readonly autoIncrement?: boolean
-	/** Index definitions for the store */
-	readonly indexes?:  readonly IndexDefinition[]
+	readonly indexes?: readonly IndexDefinition[]
+	/** TTL configuration for automatic expiration */
+	readonly ttl?: TTLOptions
 }
 
 /** Store definitions mapped by store name */
 export type StoreDefinitions<Schema extends DatabaseSchema> = {
-	readonly [K in keyof Schema]:  StoreDefinition
+	readonly [K in keyof Schema]: StoreDefinition
 }
 
 // ============================================================================
@@ -118,7 +120,7 @@ export type TransactionDurability = 'default' | 'strict' | 'relaxed'
 /** Transaction options */
 export interface TransactionOptions {
 	/** Durability hint for the transaction */
-	readonly durability?:  TransactionDurability
+	readonly durability?: TransactionDurability
 }
 
 /** Transaction operation callback */
@@ -131,15 +133,13 @@ export type TransactionOperation<
 // Cursor Types
 // ============================================================================
 
-/** Cursor iteration direction (explicit naming:  'previous' not 'prev') */
+/** Cursor direction */
 export type CursorDirection = 'next' | 'nextunique' | 'previous' | 'previousunique'
 
 /** Cursor options */
 export interface CursorOptions {
-	/** Iteration direction */
+	readonly query?: IDBKeyRange | ValidKey | null
 	readonly direction?: CursorDirection
-	/** Key range or specific key to iterate */
-	readonly query?: IDBKeyRange | ValidKey
 }
 
 /** Iteration options (alias for consistency) */
@@ -149,39 +149,40 @@ export type IterateOptions = CursorOptions
 // Query Types
 // ============================================================================
 
-/** Options for between queries */
+/** Between options for range queries */
 export interface BetweenOptions {
-	/** Exclude lower bound from range */
 	readonly lowerOpen?: boolean
-	/** Exclude upper bound from range */
-	readonly upperOpen?: boolean
+	readonly upperOpen?:  boolean
 }
 
-/** Order direction (explicit naming: 'ascending' not 'asc') */
+/** Order direction (explicit naming:  'ascending' not 'asc') */
 export type OrderDirection = 'ascending' | 'descending'
 
 // ============================================================================
 // Bulk Operation Types
 // ============================================================================
 
-/**
- * Options for bulk operations.
- */
+/** Bulk operation options */
 export interface BulkOperationOptions {
+	/** Progress callback for large operations */
+	readonly onProgress?:  (completed: number, total: number) => void
+}
+
+/** Set operation options */
+export interface SetOptions {
 	/**
-	 * Progress callback for bulk operations.
-	 *
-	 * @param current - Current item index (1-based)
-	 * @param total - Total number of items
+	 * Override default TTL for this record.
+	 * Use `null` to disable expiration for this record.
+	 * Use `undefined` to use store default. 
 	 */
-	readonly onProgress?: (current: number, total: number) => void
+	readonly ttl?: number | null
 }
 
 // ============================================================================
-// Event Types
+// Change Event Types
 // ============================================================================
 
-/** Type of change operation */
+/** Change operation type */
 export type ChangeType = 'set' | 'add' | 'remove' | 'clear'
 
 /** Source of change event */
@@ -189,14 +190,12 @@ export type ChangeSource = 'local' | 'remote'
 
 /** Change event emitted when data is modified */
 export interface ChangeEvent {
-	/** Name of the store that was modified */
-	readonly storeName: string
-	/** Type of modification */
 	readonly type: ChangeType
-	/** Keys that were affected */
-	readonly keys: readonly ValidKey[]
-	/** Whether change originated locally or from another tab */
+	readonly storeName: string
+	readonly key?:  ValidKey
+	readonly value?: unknown
 	readonly source: ChangeSource
+	readonly timestamp: number
 }
 
 /** Callback for change events */
@@ -213,7 +212,7 @@ export type BlockedCallback = (event: {
 
 /** Callback for version change events */
 export type VersionChangeCallback = (event: {
-	readonly oldVersion:  number
+	readonly oldVersion: number
 	readonly newVersion: number | null
 }) => void
 
@@ -221,16 +220,15 @@ export type VersionChangeCallback = (event: {
 // Migration Types
 // ============================================================================
 
-/** Context provided to migration functions */
+/** Migration context passed to migration functions */
 export interface MigrationContext {
-	/** Native IDBDatabase instance */
-	readonly database: IDBDatabase
-	/** Native IDBTransaction instance (versionchange mode) */
+	readonly db: IDBDatabase
 	readonly transaction: IDBTransaction
-	/** Version before upgrade */
 	readonly oldVersion: number
-	/** Version after upgrade */
 	readonly newVersion: number
+	createStore(name: string, options?:  IDBObjectStoreParameters): IDBObjectStore
+	deleteStore(name: string): void
+	getStore(name: string): IDBObjectStore
 }
 
 /** Migration function signature */
@@ -238,9 +236,7 @@ export type MigrationFunction = (context: MigrationContext) => void | Promise<vo
 
 /** Migration definition */
 export interface Migration {
-	/** Target version for this migration */
 	readonly version: number
-	/** Migration function to execute */
 	readonly migrate: MigrationFunction
 }
 
@@ -251,34 +247,30 @@ export interface Migration {
 /** Database-level subscription methods */
 export interface DatabaseSubscriptions {
 	/**
-	 * Subscribe to change events from all stores.
-	 *
-	 * @param callback - Called when data changes
-	 * @returns Cleanup function to unsubscribe
+	 * Subscribe to data changes across all stores.
+	 * @param callback - Called when data is modified
+	 * @returns Cleanup function
 	 */
 	onChange(callback: ChangeCallback): Unsubscribe
 
 	/**
-	 * Subscribe to error events.
-	 *
+	 * Subscribe to database errors.
 	 * @param callback - Called when an error occurs
-	 * @returns Cleanup function to unsubscribe
+	 * @returns Cleanup function
 	 */
 	onError(callback: ErrorCallback): Unsubscribe
 
 	/**
-	 * Subscribe to version change events (another tab wants to upgrade).
-	 *
-	 * @param callback - Called when version change requested
-	 * @returns Cleanup function to unsubscribe
+	 * Subscribe to version change events.
+	 * @param callback - Called when another connection upgrades the database
+	 * @returns Cleanup function
 	 */
 	onVersionChange(callback: VersionChangeCallback): Unsubscribe
 
 	/**
-	 * Subscribe to close events.
-	 *
-	 * @param callback - Called when database connection closes
-	 * @returns Cleanup function to unsubscribe
+	 * Subscribe to database close events.
+	 * @param callback - Called when the database is closed
+	 * @returns Cleanup function
 	 */
 	onClose(callback: () => void): Unsubscribe
 }
@@ -286,10 +278,9 @@ export interface DatabaseSubscriptions {
 /** Store-level subscription methods */
 export interface StoreSubscriptions {
 	/**
-	 * Subscribe to change events for this store.
-	 *
-	 * @param callback - Called when store data changes
-	 * @returns Cleanup function to unsubscribe
+	 * Subscribe to changes in this store.
+	 * @param callback - Called when data in this store is modified
+	 * @returns Cleanup function
 	 */
 	onChange(callback: (event: ChangeEvent) => void): Unsubscribe
 }
@@ -298,113 +289,74 @@ export interface StoreSubscriptions {
 // Options Interfaces
 // ============================================================================
 
-/** Options for creating a database */
+/** Database creation options */
 export interface DatabaseOptions<Schema extends DatabaseSchema>
 	extends SubscriptionToHook<DatabaseSubscriptions> {
-	/** Database name */
 	readonly name: string
-	/** Database version (positive integer) */
 	readonly version: number
-	/** Store definitions */
-	readonly stores:  StoreDefinitions<Schema>
-	/** Migrations to run during version upgrades */
-	readonly migrations?:  readonly Migration[]
-	/** Enable cross-tab change synchronization via BroadcastChannel.  @defaultValue `true` */
-	readonly crossTabSync?: boolean
-	/** Called when upgrade is blocked by other connections */
-	readonly onBlocked?: BlockedCallback
+	readonly stores: StoreDefinitions<Schema>
+	readonly migrations?: readonly Migration[]
 }
 
 // ============================================================================
 // Export/Import Types
 // ============================================================================
 
-/**
- * Exported database data structure.
- *
- * @remarks
- * Represents a complete snapshot of database data for backup or transfer.
- */
+/** Exported data format */
 export interface ExportedData<Schema extends DatabaseSchema> {
-	/** Database name */
-	readonly name: string
-	/** Database version */
 	readonly version: number
-	/** Export timestamp (ISO string) */
-	readonly exportedAt: string
-	/** Store data mapped by store name */
-	readonly stores: { [K in keyof Schema]: readonly Schema[K][] }
+	readonly exportedAt: number
+	readonly databaseName: string
+	readonly databaseVersion: number
+	readonly stores: {
+		readonly [K in keyof Schema]?: readonly Schema[K][]
+	}
 }
 
-/**
- * Options for importing data.
- */
+/** Import options */
 export interface ImportOptions {
-	/**
-	 * Import mode.
-	 *
-	 * - `'merge'`: Keep existing records, add/update from import (default)
-	 * - `'replace'`: Clear existing records before import
-	 */
-	readonly mode?: 'merge' | 'replace'
-
-	/**
-	 * Progress callback for import operations.
-	 *
-	 * @param storeName - Current store being imported
-	 * @param current - Current record index (1-based)
-	 * @param total - Total records in store
-	 */
-	readonly onProgress?: (storeName: string, current: number, total: number) => void
+	readonly clearExisting?: boolean
+	readonly onProgress?: (storeName: string, completed: number, total: number) => void
 }
 
 // ============================================================================
-// Storage Quota Types
+// Storage Types
 // ============================================================================
 
-/**
- * Storage estimate information.
- *
- * @remarks
- * Provides insight into browser storage usage and availability.
- */
+/** Storage estimate information */
 export interface StorageEstimate {
-	/** Approximate bytes used by this origin */
 	readonly usage: number
-	/** Approximate bytes available to this origin */
 	readonly quota: number
-	/** Percentage of quota used (0-100) */
+	readonly available: number
 	readonly percentUsed: number
 }
 
 // ============================================================================
-// Core Interfaces
+// Prune Types
+// ============================================================================
+
+/** Prune result information */
+export interface PruneResult {
+	readonly prunedCount: number
+	readonly remainingCount: number
+}
+
+// ============================================================================
+// Behavioral Interfaces
 // ============================================================================
 
 /**
- * Database connection interface.
+ * Database interface - main entry point for IndexedDB operations. 
  *
- * @remarks
- * Provides access to stores and transaction management.
- * Connection opens lazily on first operation.
- *
- * @example
- * ```ts
- * const db = await createDatabase<MySchema>({
- *   name:  'myApp',
- *   version: 1,
- *   stores: { users: {} }
- * })
- *
- * const user = await db. store('users').get('u1')
- * ```
+ * Provides type-safe access to object stores, transactions,
+ * and database lifecycle management.
  */
 export interface DatabaseInterface<Schema extends DatabaseSchema>
 	extends DatabaseSubscriptions {
-	/** Native IDBDatabase instance */
-	readonly native:  IDBDatabase
+	/** Native IDBDatabase for escape hatch access */
+	readonly native: IDBDatabase
 
-	// ─── Accessors ───────────────────────────────────────────
+	// ---- Accessors ----
 
 	/** Get the database name */
 	getName(): string
@@ -418,180 +370,75 @@ export interface DatabaseInterface<Schema extends DatabaseSchema>
 	/** Check if the database connection is open */
 	isOpen(): boolean
 
-	// ─── Store Access ────────────────────────────────────────
+	// ---- Store Access ----
 
 	/**
-	 * Get a store interface for the specified store.
-	 *
-	 * @param name - Store name
-	 * @returns Store interface
+	 * Get a store interface for operations.
+	 * @param name - Store name from schema
 	 */
 	store<K extends keyof Schema & string>(name: K): StoreInterface<Schema[K]>
 
-	// ─── Transactions ────────────────────────────────────────
+	// ---- Transactions ----
 
 	/**
 	 * Execute a read-only transaction.
-	 *
-	 * @param storeNames - Store name or array of store names
-	 * @param operation - Operation to execute within transaction
-	 *
-	 * @remarks
-	 * Use for consistent reads across multiple stores.
-	 * Single-store reads can use `store().get()` directly.
-	 *
-	 * @example
-	 * ```ts
-	 * await db.read(['users', 'settings'], async (tx) => {
-	 *   const user = await tx.store('users').get('u1')
-	 *   const prefs = await tx.store('settings').get('prefs')
-	 * })
-	 * ```
+	 * @param storeNames - Store(s) to include in transaction
+	 * @param operation - Transaction operation callback
 	 */
 	read<K extends keyof Schema & string>(
 		storeNames: K | readonly K[],
-		operation: TransactionOperation<Schema, K>
+		operation:  TransactionOperation<Schema, K>
 	): Promise<void>
 
 	/**
 	 * Execute a read-write transaction.
-	 *
-	 * @param storeNames - Store name or array of store names
-	 * @param operation - Operation to execute within transaction
-	 * @param options - Transaction options (durability hints)
-	 *
-	 * @remarks
-	 * Use for atomic modifications across multiple stores.
-	 * Transaction commits on success, aborts on error.
-	 *
-	 * @example
-	 * ```ts
-	 * await db.write(['users', 'posts'], async (tx) => {
-	 *   const user = await tx.store('users').resolve('u1')
-	 *   await tx.store('posts').set({
-	 *     id: crypto.randomUUID(),
-	 *     authorId: user.id,
-	 *     title: 'New Post'
-	 *   })
-	 * }, { durability: 'relaxed' })
-	 * ```
+	 * @param storeNames - Store(s) to include in transaction
+	 * @param operation - Transaction operation callback
+	 * @param options - Transaction options
 	 */
 	write<K extends keyof Schema & string>(
 		storeNames: K | readonly K[],
 		operation: TransactionOperation<Schema, K>,
-		options?: TransactionOptions
+		options?:  TransactionOptions
 	): Promise<void>
 
-	// ─── Lifecycle ───────────────────────────────────────────
+	// ---- Lifecycle ----
 
-	/** Close the database connection */
+	/** Close the database connection (can be reopened) */
 	close(): void
 
-	/**
-	 * Close and delete the database entirely.
-	 *
-	 * @remarks
-	 * This permanently removes all data.
-	 */
+	/** Delete the entire database */
 	drop(): Promise<void>
 
-	// ─── Export/Import ───────────────────────────────────────
+	// ---- Export/Import ----
 
-	/**
-	 * Export all data from the database.
-	 *
-	 * @returns Exported data structure
-	 *
-	 * @example
-	 * ```ts
-	 * const backup = await db.export()
-	 * const json = JSON.stringify(backup)
-	 * localStorage.setItem('backup', json)
-	 * ```
-	 */
+	/** Export all data to portable format */
 	export(): Promise<ExportedData<Schema>>
 
 	/**
-	 * Import data into the database.
-	 *
-	 * @param data - Data to import
-	 * @param options - Import options (mode, progress callback)
-	 *
-	 * @example
-	 * ```ts
-	 * const json = localStorage.getItem('backup')
-	 * const backup = JSON.parse(json)
-	 * await db.import(backup, {
-	 *   mode: 'replace',
-	 *   onProgress: (store, current, total) => {
-	 *     console.log(`${store}: ${current}/${total}`)
-	 *   }
-	 * })
-	 * ```
+	 * Import data from exported format.
+	 * @param data - Exported data
+	 * @param options - Import options
 	 */
 	import(data: ExportedData<Schema>, options?: ImportOptions): Promise<void>
 
-	// ─── Storage ─────────────────────────────────────────────
+	// ---- Storage ----
 
-	/**
-	 * Get storage estimate for this origin.
-	 *
-	 * @returns Storage usage and quota information
-	 *
-	 * @remarks
-	 * Uses the Storage API when available. Returns zeros if unsupported.
-	 *
-	 * @example
-	 * ```ts
-	 * const estimate = await db.getStorageEstimate()
-	 * if (estimate.percentUsed > 80) {
-	 *   console.warn('Storage nearly full!')
-	 * }
-	 * ```
-	 */
+	/** Get storage usage estimate */
 	getStorageEstimate(): Promise<StorageEstimate>
 }
 
 /**
- * Object store interface.
+ * Store interface - provides operations on a single object store.
  *
- * @remarks
- * Provides type-safe CRUD operations on a single object store.
- *
- * Method semantics:
- * - `get()` returns `undefined` for missing records
- * - `resolve()` throws `NotFoundError` for missing records
- * - `set()` upserts (inserts or updates)
- * - `add()` inserts only (throws `ConstraintError` if key exists)
- * - `remove()` silently succeeds if key doesn't exist
- *
- * All methods throw on infrastructure errors (quota, transaction abort, etc.).
- *
- * @example
- * ```ts
- * const store = db.store('users')
- *
- * // Simple get (undefined if missing)
- * const user = await store. get('u1')
- *
- * // Must exist (throws if missing)
- * const user = await store. resolve('u1')
- *
- * // Batch operations (single transaction)
- * await store. set([user1, user2, user3])
- * ```
+ * Supports CRUD operations, queries, cursors, and iteration
+ * with full TypeScript type safety.
  */
 export interface StoreInterface<T> extends StoreSubscriptions {
-	/**
-	 * Native IDBObjectStore instance.
-	 *
-	 * @remarks
-	 * Only valid within an active transaction context.
-	 * Throws if accessed outside a transaction.
-	 */
+	/** Native IDBObjectStore for escape hatch access (within transaction) */
 	readonly native: IDBObjectStore
 
-	// ─── Accessors ───────────────────────────────────────────
+	// ---- Accessors ----
 
 	/** Get the store name */
 	getName(): string
@@ -605,323 +452,194 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	/** Check if the store uses auto-incrementing keys */
 	hasAutoIncrement(): boolean
 
-	// ─── Get (undefined for missing) ─────────────────────────
+	/** Check if the store has TTL enabled */
+	hasTTL(): boolean
+
+	// ---- Get Operations ----
 
 	/**
-	 * Get a record by key.
-	 *
-	 * @param key - The key to look up
-	 * @returns The record, or undefined if not found
-	 *
-	 * @example
-	 * ```ts
-	 * const user = await store.get('u1')
-	 * if (user) {
-	 *   console.log(user. name)
-	 * }
-	 * ```
+	 * Get record by key (returns undefined if not found).
+	 * @param key - Record key
 	 */
-	get(key:  ValidKey): Promise<T | undefined>
+	get(key: ValidKey): Promise<T | undefined>
 
 	/**
 	 * Get multiple records by keys.
-	 *
-	 * @param keys - Array of keys to look up
-	 * @returns Array of records (undefined for missing keys)
-	 *
-	 * @example
-	 * ```ts
-	 * const users = await store.get(['u1', 'u2', 'u3'])
-	 * // users[1] may be undefined if 'u2' doesn't exist
-	 * ```
+	 * @param keys - Record keys
 	 */
 	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
 
-	// ─── Resolve (throws for missing) ────────────────────────
-
 	/**
-	 * Get a record by key, throwing if not found.
-	 *
-	 * @param key - The key to look up
-	 * @returns The record (guaranteed to exist)
-	 * @throws NotFoundError if record doesn't exist
-	 *
-	 * @example
-	 * ```ts
-	 * try {
-	 *   const user = await store.resolve('u1')
-	 *   console.log(user.name) // Safe - would have thrown
-	 * } catch (error) {
-	 *   if (error instanceof NotFoundError) {
-	 *     console.log('User not found:', error. key)
-	 *   }
-	 * }
-	 * ```
+	 * Get record by key (throws NotFoundError if not found).
+	 * @param key - Record key
 	 */
 	resolve(key: ValidKey): Promise<T>
 
 	/**
-	 * Get multiple records by keys, throwing if any are missing.
-	 *
-	 * @param keys - Array of keys to look up
-	 * @returns Array of records (all guaranteed to exist)
-	 * @throws NotFoundError if any record doesn't exist
-	 *
-	 * @example
-	 * ```ts
-	 * // Throws if u1, u2, OR u3 is missing
-	 * const users = await store.resolve(['u1', 'u2', 'u3'])
-	 * ```
+	 * Get multiple records by keys (throws if any not found).
+	 * @param keys - Record keys
 	 */
 	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
 
-	// ─── Set (upsert) ────────────────────────────────────────
+	// ---- Set Operations ----
 
 	/**
-	 * Store a record (insert or update).
-	 *
-	 * @param value - The record to store
-	 * @param key - Optional key (required if store has no keyPath)
-	 * @returns The key of the stored record
-	 *
-	 * @example
-	 * ```ts
-	 * await store.set({ id: 'u1', name:  'Alice' })
-	 * ```
+	 * Insert or update a record.
+	 * @param value - Record value
+	 * @param key - Optional key for out-of-line stores
 	 */
 	set(value: T, key?: ValidKey): Promise<ValidKey>
 
 	/**
-	 * Store multiple records in a single transaction.
-	 *
-	 * @param values - Array of records to store
-	 * @param options - Optional progress callback
-	 * @returns Array of keys for stored records
-	 *
-	 * @example
-	 * ```ts
-	 * const keys = await store.set([user1, user2, user3])
-	 * ```
+	 * Insert or update a record with options.
+	 * @param value - Record value
+	 * @param options - Set options including TTL override
 	 */
-	set(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
-
-	// ─── Add (insert only) ───────────────────────────────────
+	set(value: T, options:  SetOptions): Promise<ValidKey>
 
 	/**
-	 * Add a record (insert only, fails if key exists).
-	 *
-	 * @param value - The record to add
-	 * @param key - Optional key (required if store has no keyPath)
-	 * @returns The key of the added record
-	 * @throws ConstraintError if key already exists
-	 *
-	 * @example
-	 * ```ts
-	 * try {
-	 *   await store.add({ id: 'u1', name:  'Alice' })
-	 * } catch (error) {
-	 *   if (error instanceof ConstraintError) {
-	 *     console.log('User already exists')
-	 *   }
-	 * }
-	 * ```
+	 * Insert or update multiple records.
+	 * @param values - Record values
+	 * @param options - Bulk operation options
 	 */
-	add(value: T, key?:  ValidKey): Promise<ValidKey>
+	set(values: readonly T[], options?:  BulkOperationOptions): Promise<readonly ValidKey[]>
+
+	// ---- Add Operations ----
 
 	/**
-	 * Add multiple records (insert only, fails if any key exists).
-	 *
-	 * @param values - Array of records to add
-	 * @param options - Optional progress callback
-	 * @returns Array of keys for added records
-	 * @throws ConstraintError if any key already exists
+	 * Insert a new record (throws if key exists).
+	 * @param value - Record value
+	 * @param key - Optional key for out-of-line stores
 	 */
-	add(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
+	add(value: T, key?: ValidKey): Promise<ValidKey>
 
-	// ─── Remove ──────────────────────────────────────────────
+	/**
+	 * Insert multiple new records. 
+	 * @param values - Record values
+	 * @param options - Bulk operation options
+	 */
+	add(values:  readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
+
+	// ---- Remove Operations ----
 
 	/**
 	 * Remove a record by key.
-	 *
-	 * @param key - The key to remove
-	 *
-	 * @remarks
-	 * Silently succeeds if key doesn't exist.
+	 * @param key - Record key
 	 */
 	remove(key: ValidKey): Promise<void>
 
 	/**
 	 * Remove multiple records by keys.
-	 *
-	 * @param keys - Array of keys to remove
-	 *
-	 * @remarks
-	 * Silently succeeds for keys that don't exist.
+	 * @param keys - Record keys
 	 */
-	remove(keys:  readonly ValidKey[]): Promise<void>
+	remove(keys: readonly ValidKey[]): Promise<void>
 
-	// ─── Has ─────────────────────────────────────────────────
+	// ---- Existence Check ----
 
 	/**
 	 * Check if a record exists.
-	 *
-	 * @param key - The key to check
-	 * @returns true if record exists
+	 * @param key - Record key
 	 */
 	has(key: ValidKey): Promise<boolean>
 
 	/**
 	 * Check if multiple records exist.
-	 *
-	 * @param keys - Array of keys to check
-	 * @returns Array of booleans indicating existence
+	 * @param keys - Record keys
 	 */
 	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
 
-	// ─── Bulk Operations ─────────────────────────────────────
+	// ---- Bulk Retrieval ----
 
 	/**
-	 * Get all records, optionally filtered by key range.
-	 *
-	 * @param query - Optional key range filter
-	 * @param count - Optional maximum number of records
-	 * @returns Array of all matching records
+	 * Get all records.
+	 * @param query - Optional key range
+	 * @param count - Optional maximum count
 	 */
 	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
 
 	/**
-	 * Get all keys, optionally filtered by key range.
-	 *
-	 * @param query - Optional key range filter
-	 * @param count - Optional maximum number of keys
-	 * @returns Array of all matching keys
+	 * Get all keys.
+	 * @param query - Optional key range
+	 * @param count - Optional maximum count
 	 */
 	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
 
-	/**
-	 * Remove all records from the store.
-	 */
+	/** Remove all records */
 	clear(): Promise<void>
 
 	/**
-	 * Count records, optionally filtered.
-	 *
-	 * @param query - Optional key range or specific key
-	 * @returns Number of matching records
+	 * Count records. 
+	 * @param query - Optional key range or key
 	 */
 	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
 
-	// ─── Query Builder ───────────────────────────────────────
+	// ---- TTL Operations ----
 
 	/**
-	 * Create a query builder for fluent queries.
-	 *
-	 * @returns Query builder instance
-	 *
-	 * @example
-	 * ```ts
-	 * const active = await store.query()
-	 *   .where('status').equals('active')
-	 *   . orderBy('descending')
-	 *   .limit(10)
-	 *   .toArray()
-	 * ```
+	 * Remove expired records.
+	 * Only available if store has TTL enabled.
+	 * @returns Prune result with counts
 	 */
+	prune(): Promise<PruneResult>
+
+	/**
+	 * Check if a record is expired.
+	 * @param key - Record key
+	 */
+	isExpired(key:  ValidKey): Promise<boolean>
+
+	// ---- Query Builder ----
+
+	/** Create a query builder for complex queries */
 	query(): QueryBuilderInterface<T>
 
-	// ─── Index Access ────────────────────────────────────────
+	// ---- Index Access ----
 
 	/**
-	 * Get an index interface for querying by indexed field.
-	 *
+	 * Get an index interface. 
 	 * @param name - Index name
-	 * @returns Index interface
-	 *
-	 * @example
-	 * ```ts
-	 * const user = await store.index('byEmail').get('alice@example.com')
-	 * ```
 	 */
-	index(name:  string): IndexInterface<T>
+	index(name: string): IndexInterface<T>
 
-	// ─── Iteration ───────────────────────────────────────────
+	// ---- Iteration ----
 
 	/**
-	 * Iterate over all records using an async generator.
-	 *
+	 * Iterate all records.
 	 * @param options - Cursor options
-	 * @returns Async generator yielding records
-	 *
-	 * @remarks
-	 * Memory-efficient:  only one record in memory at a time.
-	 * Supports early termination via `break`.
-	 *
-	 * @example
-	 * ```ts
-	 * for await (const user of store.iterate()) {
-	 *   console.log(user.name)
-	 *   if (done) break
-	 * }
-	 * ```
 	 */
 	iterate(options?: IterateOptions): AsyncGenerator<T, void, unknown>
 
 	/**
-	 * Iterate over all keys using an async generator.
-	 *
+	 * Iterate all keys.
 	 * @param options - Cursor options
-	 * @returns Async generator yielding keys
 	 */
-	iterateKeys(options?:  IterateOptions): AsyncGenerator<ValidKey, void, unknown>
+	iterateKeys(options?: IterateOptions): AsyncGenerator<ValidKey, void, unknown>
 
-	// ─── Cursor (Manual) ─────────────────────────────────────
+	// ---- Cursors ----
 
 	/**
-	 * Open a cursor for manual iteration.
-	 *
+	 * Open a cursor for manual iteration/mutation.
 	 * @param options - Cursor options
-	 * @returns Cursor interface, or null if no records
-	 *
-	 * @remarks
-	 * Use for update/delete during iteration.
-	 * Prefer `iterate()` for read-only access.
-	 *
-	 * @example
-	 * ```ts
-	 * await db.transaction(['users'], 'readwrite', async (tx) => {
-	 *   let cursor = await tx.store('users').openCursor()
-	 *   while (cursor) {
-	 *     if (cursor.getValue().inactive) {
-	 *       await cursor.delete()
-	 *     }
-	 *     cursor = await cursor. continue()
-	 *   }
-	 * })
-	 * ```
 	 */
-	openCursor(options?:  CursorOptions): Promise<CursorInterface<T> | null>
+	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
 
 	/**
-	 * Open a key-only cursor for manual iteration.
-	 *
+	 * Open a key cursor. 
 	 * @param options - Cursor options
-	 * @returns Key cursor interface, or null if no records
 	 */
-	openKeyCursor(options?:  CursorOptions): Promise<KeyCursorInterface | null>
+	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
 }
 
 /**
- * Index interface for querying by indexed field.
+ * Index interface - provides operations on an index.
  *
- * @remarks
- * Provides the same query methods as StoreInterface but operates
- * on an index instead of the primary key.
+ * Supports lookups, queries, and iteration by index key.
  */
 export interface IndexInterface<T> {
-	/** Native IDBIndex instance */
+	/** Native IDBIndex for escape hatch access */
 	readonly native: IDBIndex
 
-	// ─── Accessors ───────────────────────────────────────────
+	// ---- Accessors ----
 
 	/** Get the index name */
 	getName(): string
@@ -935,169 +653,122 @@ export interface IndexInterface<T> {
 	/** Check if the index is multi-entry */
 	isMultiEntry(): boolean
 
-	// ─── Get (undefined for missing) ─────────────────────────
+	// ---- Get Operations ----
 
 	/**
-	 * Get a record by index key.
-	 *
-	 * @param key - The index key to look up
-	 * @returns The record, or undefined if not found
+	 * Get record by index key. 
+	 * @param key - Index key
 	 */
 	get(key: ValidKey): Promise<T | undefined>
 
 	/**
 	 * Get multiple records by index keys.
-	 *
-	 * @param keys - Array of index keys to look up
-	 * @returns Array of records (undefined for missing keys)
+	 * @param keys - Index keys
 	 */
 	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
 
-	// ─── Resolve (throws for missing) ────────────────────────
-
 	/**
-	 * Get a record by index key, throwing if not found.
-	 *
-	 * @param key - The index key to look up
-	 * @returns The record (guaranteed to exist)
-	 * @throws NotFoundError if record doesn't exist
+	 * Get record by index key (throws if not found).
+	 * @param key - Index key
 	 */
 	resolve(key: ValidKey): Promise<T>
 
 	/**
-	 * Get multiple records by index keys, throwing if any are missing.
-	 *
-	 * @param keys - Array of index keys to look up
-	 * @returns Array of records (all guaranteed to exist)
-	 * @throws NotFoundError if any record doesn't exist
+	 * Get multiple records by index keys (throws if any not found).
+	 * @param keys - Index keys
 	 */
 	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
 
-	// ─── Primary Key Lookup ──────────────────────────────────
-
 	/**
 	 * Get the primary key for an index key.
-	 *
-	 * @param key - The index key to look up
-	 * @returns The primary key, or undefined if not found
+	 * @param key - Index key
 	 */
 	getKey(key: ValidKey): Promise<ValidKey | undefined>
 
-	// ─── Has ─────────────────────────────────────────────────
+	// ---- Existence Check ----
 
 	/**
-	 * Check if record(s) exist by index key.
-	 *
-	 * @param key - The index key to check
-	 * @returns true if at least one record exists
+	 * Check if a record exists by index key.
+	 * @param key - Index key
 	 */
 	has(key: ValidKey): Promise<boolean>
 
 	/**
-	 * Check if records exist by index keys.
-	 *
-	 * @param keys - The index keys to check
-	 * @returns Array of booleans indicating existence
+	 * Check if multiple records exist by index keys.
+	 * @param keys - Index keys
 	 */
 	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
 
-	// ─── Bulk Operations ─────────────────────────────────────
+	// ---- Bulk Retrieval ----
 
 	/**
-	 * Get all records matching a query.
-	 *
-	 * @param query - Optional key range filter
-	 * @param count - Optional maximum number of records
-	 * @returns Array of matching records
+	 * Get all records by index. 
+	 * @param query - Optional key range
+	 * @param count - Optional maximum count
 	 */
 	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
 
 	/**
-	 * Get all primary keys matching a query.
-	 *
-	 * @param query - Optional key range filter
-	 * @param count - Optional maximum number of keys
-	 * @returns Array of matching primary keys
+	 * Get all primary keys by index.
+	 * @param query - Optional key range
+	 * @param count - Optional maximum count
 	 */
 	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
 
 	/**
-	 * Count records matching a query.
-	 *
-	 * @param query - Optional key range or specific key
-	 * @returns Number of matching records
+	 * Count records by index.
+	 * @param query - Optional key range or key
 	 */
 	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
 
-	// ─── Query Builder ───────────────────────────────────────
+	// ---- Query Builder ----
 
-	/**
-	 * Create a query builder for this index.
-	 *
-	 * @returns Query builder instance
-	 */
+	/** Create a query builder for this index */
 	query(): QueryBuilderInterface<T>
 
-	// ─── Iteration ───────────────────────────────────────────
+	// ---- Iteration ----
 
 	/**
-	 * Iterate over records using an async generator.
-	 *
+	 * Iterate records by index.
 	 * @param options - Cursor options
-	 * @returns Async generator yielding records
 	 */
-	iterate(options?: IterateOptions): AsyncGenerator<T, void, unknown>
+	iterate(options?:  IterateOptions): AsyncGenerator<T, void, unknown>
 
 	/**
-	 * Iterate over keys using an async generator.
-	 *
+	 * Iterate keys by index.
 	 * @param options - Cursor options
-	 * @returns Async generator yielding index keys
 	 */
 	iterateKeys(options?: IterateOptions): AsyncGenerator<ValidKey, void, unknown>
 
-	// ─── Cursor (Manual) ─────────────────────────────────────
+	// ---- Cursors ----
 
 	/**
 	 * Open a cursor on this index.
-	 *
 	 * @param options - Cursor options
-	 * @returns Cursor interface, or null if no records
 	 */
-	openCursor(options?:  CursorOptions): Promise<CursorInterface<T> | null>
+	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
 
 	/**
-	 * Open a key-only cursor on this index.
-	 *
+	 * Open a key cursor on this index.
 	 * @param options - Cursor options
-	 * @returns Key cursor interface, or null if no records
 	 */
 	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
 }
 
 /**
- * Transaction interface for explicit transaction control.
+ * Transaction interface - scoped database operations.
  *
- * @remarks
- * Use for multi-store atomic operations.
- * Transaction commits on success, aborts on error.
- *
- * @example
- * ```ts
- * await db.transaction(['users', 'posts'], 'readwrite', async (tx) => {
- *   const user = await tx. store('users').resolve('u1')
- *   await tx.store('posts').set({ authorId: user.id, title: 'Hello' })
- * })
- * ```
+ * Provides atomic operations across multiple stores
+ * with automatic commit on success or abort on error.
  */
 export interface TransactionInterface<
 	Schema extends DatabaseSchema,
 	K extends keyof Schema
 > {
-	/** Native IDBTransaction instance */
+	/** Native IDBTransaction for escape hatch access */
 	readonly native: IDBTransaction
 
-	// ─── Accessors ───────────────────────────────────────────
+	// ---- Accessors ----
 
 	/** Get the transaction mode */
 	getMode(): TransactionMode
@@ -1111,47 +782,31 @@ export interface TransactionInterface<
 	/** Check if the transaction has finished (committed or aborted) */
 	isFinished(): boolean
 
-	// ─── Store Access ────────────────────────────────────────
+	// ---- Store Access ----
 
 	/**
 	 * Get a store interface within this transaction.
-	 *
-	 * @param name - Store name (must be in transaction scope)
-	 * @returns Store interface bound to this transaction
+	 * @param name - Store name
 	 */
 	store<S extends K & string>(name: S): TransactionStoreInterface<Schema[S]>
 
-	// ─── Control ─────────────────────────────────────────────
+	// ---- Control ----
 
-	/**
-	 * Abort the transaction.
-	 *
-	 * @remarks
-	 * All changes made in this transaction will be rolled back.
-	 */
+	/** Abort the transaction */
 	abort(): void
 
-	/**
-	 * Explicitly commit the transaction.
-	 *
-	 * @remarks
-	 * Only available in browsers that support explicit commit.
-	 * Transaction commits automatically on success otherwise.
-	 */
+	/** Explicitly commit the transaction */
 	commit(): void
 }
 
 /**
- * Transaction-bound index interface.
- *
- * @remarks
- * Subset of IndexInterface that operates within a transaction.
- * Does not include query(), iterate(), or iterateKeys() as these
- * require transaction lifecycle control.
+ * Transaction index interface - index operations within a transaction.
  */
 export interface TransactionIndexInterface<T> {
-	/** Access the underlying IDBIndex */
+	/** Native IDBIndex for escape hatch access */
 	readonly native: IDBIndex
+
+	// ---- Accessors ----
 
 	/** Get the index name */
 	getName(): string
@@ -1165,13 +820,15 @@ export interface TransactionIndexInterface<T> {
 	/** Check if the index is multi-entry */
 	isMultiEntry(): boolean
 
+	// ---- Operations ----
+
 	/** Get record(s) by index key */
 	get(key: ValidKey): Promise<T | undefined>
 	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
 
 	/** Get record(s) by index key, throwing if not found */
 	resolve(key: ValidKey): Promise<T>
-	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
+	resolve(keys:  readonly ValidKey[]): Promise<readonly T[]>
 
 	/** Check if record(s) exist by index key */
 	has(key: ValidKey): Promise<boolean>
@@ -1181,7 +838,7 @@ export interface TransactionIndexInterface<T> {
 	getKey(key: ValidKey): Promise<ValidKey | undefined>
 
 	/** Get all records matching a query */
-	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
+	all(query?:  IDBKeyRange | null, count?: number): Promise<readonly T[]>
 
 	/** Get all keys matching a query */
 	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
@@ -1190,83 +847,68 @@ export interface TransactionIndexInterface<T> {
 	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
 
 	/** Open a cursor */
-	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
+	openCursor(options?:  CursorOptions): Promise<CursorInterface<T> | null>
 
 	/** Open a key cursor */
 	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
 }
 
 /**
- * Store interface within a transaction context.
- *
- * @remarks
- * Similar to StoreInterface but all operations are bound to
- * the parent transaction.
+ * Transaction store interface - store operations within a transaction.
  */
 export interface TransactionStoreInterface<T> {
-	/** Native IDBObjectStore instance */
+	/** Native IDBObjectStore for escape hatch access */
 	readonly native: IDBObjectStore
 
-	// ─── Get (undefined for missing) ─────────────────────────
+	// ---- Get Operations ----
 
 	get(key: ValidKey): Promise<T | undefined>
 	get(keys: readonly ValidKey[]): Promise<readonly (T | undefined)[]>
 
-	// ─── Resolve (throws for missing) ────────────────────────
-
 	resolve(key: ValidKey): Promise<T>
-	resolve(keys: readonly ValidKey[]): Promise<readonly T[]>
+	resolve(keys:  readonly ValidKey[]): Promise<readonly T[]>
 
-	// ─── Set (upsert) ────────────────────────────────────────
+	// ---- Mutate Operations ----
 
-	set(value: T, key?:  ValidKey): Promise<ValidKey>
-	set(values:  readonly T[]): Promise<readonly ValidKey[]>
-
-	// ─── Add (insert only) ───────────────────────────────────
+	set(value: T, key?: ValidKey): Promise<ValidKey>
+	set(values: readonly T[]): Promise<readonly ValidKey[]>
 
 	add(value: T, key?: ValidKey): Promise<ValidKey>
-	add(values: readonly T[]): Promise<readonly ValidKey[]>
-
-	// ─── Remove ──────────────────────────────────────────────
+	add(values:  readonly T[]): Promise<readonly ValidKey[]>
 
 	remove(key: ValidKey): Promise<void>
 	remove(keys: readonly ValidKey[]): Promise<void>
 
-	// ─── Has ─────────────────────────────────────────────────
+	// ---- Existence ----
 
-	/** Check if record(s) exist by primary key */
 	has(key: ValidKey): Promise<boolean>
 	has(keys: readonly ValidKey[]): Promise<readonly boolean[]>
 
-	// ─── Bulk Operations ─────────────────────────────────────
+	// ---- Bulk ----
 
 	all(query?: IDBKeyRange | null, count?: number): Promise<readonly T[]>
 	keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]>
 	clear(): Promise<void>
-	count(query?:  IDBKeyRange | ValidKey | null): Promise<number>
+	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
 
-	// ─── Index Access ────────────────────────────────────────
+	// ---- Index ----
 
-	/** Get an index bound to this transaction */
 	index(name: string): TransactionIndexInterface<T>
 
-	// ─── Cursor ──────────────────────────────────────────────
+	// ---- Cursors ----
 
 	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
 	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
 }
 
 /**
- * Cursor interface for iterating over records.
- *
- * @remarks
- * Supports navigation and mutation (update/delete) during iteration.
+ * Cursor interface - manual iteration and mutation.
  */
 export interface CursorInterface<T> {
-	/** Native IDBCursorWithValue instance */
+	/** Native IDBCursorWithValue for escape hatch access */
 	readonly native: IDBCursorWithValue
 
-	// ─── Accessors ───────────────────────────────────────────
+	// ---- Accessors ----
 
 	/** Get the current key */
 	getKey(): ValidKey
@@ -1280,60 +922,47 @@ export interface CursorInterface<T> {
 	/** Get the cursor direction */
 	getDirection(): CursorDirection
 
-	// ─── Navigation ──────────────────────────────────────────
+	// ---- Navigation ----
 
 	/**
-	 * Advance to the next record.
-	 *
+	 * Advance to next record.
 	 * @param key - Optional key to advance to
-	 * @returns Next cursor position, or null if no more records
 	 */
 	continue(key?: ValidKey): Promise<CursorInterface<T> | null>
 
 	/**
-	 * Advance to a specific primary key.
-	 *
-	 * @param key - Index key to advance to
-	 * @param primaryKey - Primary key to advance to
-	 * @returns Next cursor position, or null if not found
+	 * Advance to specific key and primary key.
+	 * @param key - Index key
+	 * @param primaryKey - Primary key
 	 */
 	continuePrimaryKey(key: ValidKey, primaryKey: ValidKey): Promise<CursorInterface<T> | null>
 
 	/**
-	 * Advance by a number of records.
-	 *
+	 * Skip multiple records.
 	 * @param count - Number of records to skip
-	 * @returns Next cursor position, or null if past end
 	 */
 	advance(count: number): Promise<CursorInterface<T> | null>
 
-	// ─── Mutation ────────────────────────────────────────────
+	// ---- Mutation ----
 
 	/**
-	 * Update the current record.
-	 *
-	 * @param value - New value for the record
-	 * @returns The key of the updated record
+	 * Update current record.
+	 * @param value - New value
 	 */
 	update(value: T): Promise<ValidKey>
 
-	/**
-	 * Delete the current record.
-	 */
+	/** Delete current record */
 	delete(): Promise<void>
 }
 
 /**
- * Key-only cursor interface.
- *
- * @remarks
- * More efficient than full cursor when only keys are needed.
+ * Key cursor interface - iteration without loading values.
  */
 export interface KeyCursorInterface {
-	/** Native IDBCursor instance */
+	/** Native IDBCursor for escape hatch access */
 	readonly native: IDBCursor
 
-	// ─── Accessors ───────────────────────────────────────────
+	// ---- Accessors ----
 
 	/** Get the current key */
 	getKey(): ValidKey
@@ -1344,368 +973,151 @@ export interface KeyCursorInterface {
 	/** Get the cursor direction */
 	getDirection(): CursorDirection
 
-	// ─── Navigation ──────────────────────────────────────────
+	// ---- Navigation ----
 
-	/**
-	 * Advance to the next key.
-	 *
-	 * @param key - Optional key to advance to
-	 * @returns Next cursor position, or null if no more keys
-	 */
 	continue(key?: ValidKey): Promise<KeyCursorInterface | null>
-
-	/**
-	 * Advance to a specific primary key.
-	 *
-	 * @param key - Index key to advance to
-	 * @param primaryKey - Primary key to advance to
-	 * @returns Next cursor position, or null if not found
-	 */
 	continuePrimaryKey(key: ValidKey, primaryKey: ValidKey): Promise<KeyCursorInterface | null>
-
-	/**
-	 * Advance by a number of keys.
-	 *
-	 * @param count - Number of keys to skip
-	 * @returns Next cursor position, or null if past end
-	 */
 	advance(count: number): Promise<KeyCursorInterface | null>
 }
 
 /**
- * Query builder interface for fluent queries.
- *
- * @remarks
- * The query builder maps directly to IndexedDB capabilities:
- * - `where()` uses native IDBKeyRange operations (fast)
- * - `filter()` applies post-cursor predicates (flexible)
- *
- * @example
- * ```ts
- * // Native query (fast - uses index)
- * const active = await store.query()
- *   . where('status').equals('active')
- *   .toArray()
- *
- * // Filter (flexible - post-cursor)
- * const gmail = await store.query()
- *   .filter(u => u.email.endsWith('@gmail.com'))
- *   .toArray()
- *
- * // Combined
- * const activeGmail = await store.query()
- *   .where('status').equals('active')
- *   .filter(u => u. email.endsWith('@gmail.com'))
- *   .toArray()
- * ```
+ * Query builder interface - fluent query construction.
  */
 export interface QueryBuilderInterface<T> {
 	/**
-	 * Add an indexed filter (uses IDBKeyRange).
-	 *
-	 * @param keyPath - Field name or key path to query
-	 * @returns Where clause builder
+	 * Start a where clause on a key path.
+	 * @param keyPath - Field to query
 	 */
 	where(keyPath: string): WhereClauseInterface<T>
 
 	/**
-	 * Add a post-cursor filter predicate.
-	 *
+	 * Add a filter predicate (post-cursor).
 	 * @param predicate - Filter function
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Use for conditions that cannot use indexes (endsWith, contains, etc.).
 	 */
-	filter(predicate: (value:  T) => boolean): QueryBuilderInterface<T>
+	filter(predicate: (value: T) => boolean): QueryBuilderInterface<T>
 
-	/**
-	 * Set the result ordering to ascending (default).
-	 *
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Results are sorted in ascending key order. This is the default.
-	 */
+	/** Sort ascending */
 	ascending(): QueryBuilderInterface<T>
 
-	/**
-	 * Set the result ordering to descending.
-	 *
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Results are sorted in descending key order.
-	 */
+	/** Sort descending */
 	descending(): QueryBuilderInterface<T>
 
-	/**
-	 * Get the underlying IDBKeyRange for this query.
-	 *
-	 * @returns The IDBKeyRange, or null if no range is set
-	 *
-	 * @remarks
-	 * Useful for introspection or passing to native APIs.
-	 * Returns null if the query uses anyOf() or only filters.
-	 *
-	 * @example
-	 * ```ts
-	 * const query = store.query().where('age').between(18, 65)
-	 * const range = query.getRange()
-	 * if (range?.includes(25)) {
-	 *   console.log('Age 25 is within range')
-	 * }
-	 * ```
-	 */
+	/** Get the constructed IDBKeyRange */
 	getRange(): IDBKeyRange | null
 
 	/**
-	 * Limit the number of results.
-	 *
-	 * @param count - Maximum number of results
-	 * @returns Query builder for chaining
+	 * Limit result count.
+	 * @param count - Maximum results
 	 */
 	limit(count: number): QueryBuilderInterface<T>
 
 	/**
-	 * Skip the first N results.
-	 *
-	 * @param count - Number of results to skip
-	 * @returns Query builder for chaining
+	 * Skip initial results.
+	 * @param count - Results to skip
 	 */
 	offset(count: number): QueryBuilderInterface<T>
 
-	// ─── Terminal Operations ─────────────────────────────────
+	// ---- Terminal Operations ----
 
-	/**
-	 * Execute the query and return all matching records.
-	 *
-	 * @returns Array of matching records
-	 */
+	/** Execute and return all matching records */
 	toArray(): Promise<readonly T[]>
 
-	/**
-	 * Execute the query and return the first matching record.
-	 *
-	 * @returns First matching record, or undefined
-	 */
+	/** Execute and return first matching record */
 	first(): Promise<T | undefined>
 
-	/**
-	 * Execute the query and return the count of matching records.
-	 *
-	 * @returns Number of matching records
-	 */
+	/** Execute and return count of matching records */
 	count(): Promise<number>
 
-	/**
-	 * Execute the query and return all matching keys.
-	 *
-	 * @returns Array of matching keys
-	 */
+	/** Execute and return all matching keys */
 	keys(): Promise<readonly ValidKey[]>
 
-	/**
-	 * Execute the query using an async generator.
-	 *
-	 * @returns Async generator yielding records
-	 *
-	 * @remarks
-	 * Memory-efficient: only one record in memory at a time.
-	 */
+	/** Execute and iterate matching records */
 	iterate(): AsyncGenerator<T, void, unknown>
 }
 
 /**
- * Where clause interface for building index queries.
- *
- * @remarks
- * All methods map directly to IDBKeyRange operations.
- * Method names are fully spelled out (no abbreviations).
+ * Where clause interface - query conditions.
  */
 export interface WhereClauseInterface<T> {
 	/**
-	 * Match records where key equals value.
-	 *
-	 * @param value - Value to match (any type)
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * For valid IndexedDB keys (string, number, Date, ArrayBuffer, Array),
-	 * uses `IDBKeyRange.only(value)` for optimal performance.
-	 *
-	 * For non-indexable types (boolean, null, undefined, object),
-	 * automatically falls back to post-cursor filtering.
-	 * This is less efficient but allows querying by any field type.
-	 *
-	 * @example
-	 * ```ts
-	 * // String key - uses index
-	 * query.where('status').equals('active')
-	 *
-	 * // Boolean - falls back to filter
-	 * query.where('published').equals(true)
-	 * ```
+	 * Exact match (handles non-indexable types).
+	 * @param value - Value to match
 	 */
 	equals(value: ValidKey | boolean | null | undefined): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is greater than value.
-	 *
+	 * Greater than comparison.
 	 * @param value - Lower bound (exclusive)
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Uses `IDBKeyRange.lowerBound(value, true)`.
 	 */
 	greaterThan(value: ValidKey): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is greater than or equal to value.
-	 *
+	 * Greater than or equal comparison.
 	 * @param value - Lower bound (inclusive)
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Uses `IDBKeyRange.lowerBound(value, false)`.
 	 */
-	greaterThanOrEqual(value: ValidKey): QueryBuilderInterface<T>
+	greaterThanOrEqual(value:  ValidKey): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is less than value.
-	 *
+	 * Less than comparison.
 	 * @param value - Upper bound (exclusive)
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Uses `IDBKeyRange.upperBound(value, true)`.
 	 */
 	lessThan(value: ValidKey): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is less than or equal to value.
-	 *
+	 * Less than or equal comparison.
 	 * @param value - Upper bound (inclusive)
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Uses `IDBKeyRange.upperBound(value, false)`.
 	 */
-	lessThanOrEqual(value: ValidKey): QueryBuilderInterface<T>
+	lessThanOrEqual(value:  ValidKey): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is between bounds.
-	 *
+	 * Range query. 
 	 * @param lower - Lower bound
 	 * @param upper - Upper bound
-	 * @param options - Bound exclusivity options
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Uses `IDBKeyRange.bound()`.
+	 * @param options - Bound inclusivity options
 	 */
-	between(lower: ValidKey, upper: ValidKey, options?: BetweenOptions): QueryBuilderInterface<T>
+	between(lower: ValidKey, upper: ValidKey, options?:  BetweenOptions): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where string key starts with prefix.
-	 *
-	 * @param prefix - String prefix to match
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Uses `IDBKeyRange.bound(prefix, prefix + '\uffff')`.
+	 * String prefix match.
+	 * @param prefix - Prefix to match
 	 */
-	startsWith(prefix: string): QueryBuilderInterface<T>
+	startsWith(prefix:  string): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is one of the given values.
-	 *
-	 * @param values - Array of values to match
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * Executes multiple index queries and merges results.
-	 * Results are deduplicated by primary key.
+	 * Match any of the values.
+	 * @param values - Values to match
 	 */
 	anyOf(values: readonly ValidKey[]): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where key is NOT one of the given values.
-	 *
-	 * @param values - Array of values to exclude
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * **Performance:** This operation uses post-cursor filtering (O(n) table scan).
-	 * IndexedDB has no native "not in" operation. For better performance,
-	 * consider restructuring your data to use positive queries with `anyOf()`.
-	 *
-	 * @example
-	 * ```ts
-	 * // Exclude deleted and archived records (O(n) scan)
-	 * const active = await store.query()
-	 *   .where('status').noneOf(['deleted', 'archived'])
-	 *   .toArray()
-	 * ```
+	 * Match none of the values.
+	 * @param values - Values to exclude
 	 */
 	noneOf(values: readonly ValidKey[]): QueryBuilderInterface<T>
 
 	/**
-	 * Match records where string key ends with suffix.
-	 *
-	 * @param suffix - String suffix to match
-	 * @returns Query builder for chaining
-	 *
-	 * @remarks
-	 * **Performance:** This operation uses post-cursor filtering (O(n) table scan).
-	 * IndexedDB cannot use indexes for suffix matching. For better performance,
-	 * consider storing a reversed version of the field and using `startsWith()`.
-	 *
-	 * @example
-	 * ```ts
-	 * // Find Gmail users (O(n) scan)
-	 * const gmailUsers = await store.query()
-	 *   .where('email').endsWith('@gmail.com')
-	 *   .toArray()
-	 * ```
+	 * String suffix match (filter-based).
+	 * @param suffix - Suffix to match
 	 */
-	endsWith(suffix: string): QueryBuilderInterface<T>
+	endsWith(suffix:  string): QueryBuilderInterface<T>
 }
 
 // ============================================================================
-// Factory Types
+// Factory Function Types
 // ============================================================================
 
-/**
- * Create a database connection.
- *
- * @param options - Database configuration
- * @returns Promise resolving to database interface
- *
- * @example
- * ```ts
- * const db = await createDatabase<MySchema>({
- *   name:  'myApp',
- *   version: 1,
- *   stores: {
- *     users: {},
- *     posts: {
- *       keyPath: 'slug',
- *       indexes: [{ name: 'byAuthor', keyPath: 'authorId' }]
- *     }
- *   }
- * })
- * ```
- */
+/** Factory function type for creating databases */
 export type CreateDatabase = <Schema extends DatabaseSchema>(
 	options: DatabaseOptions<Schema>
 ) => Promise<DatabaseInterface<Schema>>
 
-/**
- * Creates a deferred promise with external resolve/reject.
- */
+// ============================================================================
+// Internal Utility Types
+// ============================================================================
+
+/** Deferred promise wrapper */
 export interface Deferred<T> {
-	promise: Promise<T>
-	resolve: (value: T) => void
-	reject: (reason: unknown) => void
+	readonly promise: Promise<T>
+	resolve(value: T): void
+	reject(error: Error): void
 }
