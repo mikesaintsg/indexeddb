@@ -1,8 +1,8 @@
-import { defineConfig } from 'vitest/config'
-import { resolve } from 'path'
+import { mergeConfig } from 'vitest/config'
+import viteConfig from './vite.config'
 import { playwright } from '@vitest/browser-playwright'
 
-export default defineConfig({
+export default mergeConfig(viteConfig, {
 	test: {
 		include: ['tests/**/*.test.ts'],
 		browser: {
@@ -13,10 +13,5 @@ export default defineConfig({
 			],
 		},
 		setupFiles: ['./tests/setup.ts'],
-	},
-	resolve: {
-		alias: {
-			'~/src': resolve(__dirname, 'src'),
-		},
 	},
 })

@@ -117,6 +117,7 @@ npm test         # Unit tests
 5. **Model nullability explicitly** — Use `T | undefined` and optional fields
 6. **Named exports only** — Avoid default exports (except when required by frameworks)
 7. **ESM imports** — Always include `.js` extensions: `import { x } from './foo.js'`
+8. **No Re-exports of types** — Import types directly where needed, only the export barrel should re-export
 
 ### Type Guards and Narrowing
 
@@ -260,35 +261,35 @@ TypeScript's type system enforces interface contracts at compile time, making ab
 
 ### Method Prefix Categories
 
-| Category         | Prefix                               | Return Type          | Purpose                    |
-|------------------|--------------------------------------|----------------------|----------------------------|
-| **Accessors**    | `get`, `peek`, `at`                  | `T \| undefined`     | Optional lookup (may fail) |
-|                  | `resolve`                            | `T` (throws)         | Required lookup (must exist) |
-|                  | `has`, `is`                          | boolean              | Check existence/state      |
-|                  | `all`, `keys`, `entries`             | readonly collection  | Bulk retrieval             |
-| **Mutators**     | `set`, `update`                      | void/this            | Assign or modify           |
-|                  | `add`, `create`                      | void/instance        | Insert new (accepts arrays) |
-|                  | `append`, `prepend`, `insert`        | void/this            | Add elements               |
-|                  | `remove`, `clear`                    | void/this            | Remove elements            |
-| **Transformers** | `to`, `as`, `map`, `filter`, `clone` | new instance         | Transform (pure)           |
-| **Constructors** | `from`, `of`, `create`               | instance             | Factory functions          |
-| **Commands**     | `run`, `exec`, `apply`, `compute`    | result               | Execute operations         |
-|                  | `validate`, `check`                  | boolean/result       | Verify correctness         |
-| **Lifecycle**    | `init`, `load`, `save`, `reset`      | void/any             | State management           |
-|                  | `close`                              | void                 | Close connections          |
-|                  | `destroy`                            | void                 | Destroy entire resource    |
-|                  | `drop`                               | void/Promise         | Delete table/store         |
-| **Events**       | `on`                                 | Unsubscribe fn       | Event subscription         |
-| **Async**        | `waitFor`, `schedule`, `ensure`      | Promise              | Async operations           |
+| Category         | Prefix                               | Return Type         | Purpose                      |
+|------------------|--------------------------------------|---------------------|------------------------------|
+| **Accessors**    | `get`, `peek`, `at`                  | `T \| undefined`    | Optional lookup (may fail)   |
+|                  | `resolve`                            | `T` (throws)        | Required lookup (must exist) |
+|                  | `has`, `is`                          | boolean             | Check existence/state        |
+|                  | `all`, `keys`, `entries`             | readonly collection | Bulk retrieval               |
+| **Mutators**     | `set`, `update`                      | void/this           | Assign or modify             |
+|                  | `add`, `create`                      | void/instance       | Insert new (accepts arrays)  |
+|                  | `append`, `prepend`, `insert`        | void/this           | Add elements                 |
+|                  | `remove`, `clear`                    | void/this           | Remove elements              |
+| **Transformers** | `to`, `as`, `map`, `filter`, `clone` | new instance        | Transform (pure)             |
+| **Constructors** | `from`, `of`, `create`               | instance            | Factory functions            |
+| **Commands**     | `run`, `exec`, `apply`, `compute`    | result              | Execute operations           |
+|                  | `validate`, `check`                  | boolean/result      | Verify correctness           |
+| **Lifecycle**    | `init`, `load`, `save`, `reset`      | void/any            | State management             |
+|                  | `close`                              | void                | Close connections            |
+|                  | `destroy`                            | void                | Destroy entire resource      |
+|                  | `drop`                               | void/Promise        | Delete table/store           |
+| **Events**       | `on`                                 | Unsubscribe fn      | Event subscription           |
+| **Async**        | `waitFor`, `schedule`, `ensure`      | Promise             | Async operations             |
 
 ### Accessor Semantics: `get` vs `resolve`
 
 The distinction between `get` and `resolve` is critical for expressing intent:
 
-| Method      | Returns            | When Item Missing        | Use When                        |
-|-------------|--------------------|--------------------------|---------------------------------|
-| `get(key)`  | `T \| undefined`   | Returns `undefined`      | Lookup is optional, check result |
-| `resolve(key)` | `T`             | Throws `NotFoundError`   | Item must exist, handle error   |
+| Method         | Returns          | When Item Missing      | Use When                         |
+|----------------|------------------|------------------------|----------------------------------|
+| `get(key)`     | `T \| undefined` | Returns `undefined`    | Lookup is optional, check result |
+| `resolve(key)` | `T`              | Throws `NotFoundError` | Item must exist, handle error    |
 
 ```typescript
 // get() — Optional lookup, caller checks result
@@ -812,22 +813,21 @@ interface ValidationError {
 
 ```typescript
 // vitest.config.ts
-import { defineConfig } from 'vitest/config'
-import { resolve } from 'path'
+import { mergeConfig } from 'vitest/config'
+import viteConfig from './vite.config'
 import { playwright } from '@vitest/browser-playwright'
 
-export default defineConfig({
+export default mergeConfig(viteConfig, {
 	test: {
 		include: ['tests/**/*.test.ts'],
 		browser: {
 			enabled: true,
 			provider: playwright(),
-			instances: [{ browser: 'chromium' }],
+			instances: [
+				{ browser: 'chromium' },
+			],
 		},
 		setupFiles: ['./tests/setup.ts'],
-	},
-	resolve: {
-		alias: { '~/src': resolve(__dirname, 'src') },
 	},
 })
 ```
