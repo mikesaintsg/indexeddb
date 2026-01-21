@@ -2,7 +2,7 @@
  * Shared types and utilities for showcase examples
  */
 
-import type { DatabaseSchema, ChangeEvent } from '~/src/types.js'
+import type { DatabaseSchema, ChangeEvent } from '@mikesaintsg/indexeddb'
 
 // ============================================================================
 // Schema Definition

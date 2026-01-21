@@ -13,54 +13,11 @@ import type {
 	WhereClauseInterface,
 	ValidKey,
 	BetweenOptions,
+	QueryState,
+	QueryContext,
 } from '../types.js'
-import { toIDBCursorDirection, isValidKey, extractKey } from '../helpers.js'
+import { toIDBCursorDirection, isValidKey, extractKey, createInitialQueryState } from '../helpers.js'
 import { wrapError } from '../errors.js'
-
-/** Internal query state */
-interface QueryState<T> {
-	/** Key path being queried (primary key or index) */
-	keyPath: string | null
-	/** IDBKeyRange for indexed query */
-	range: IDBKeyRange | null
-	/** Array of values for anyOf queries */
-	anyOfValues: readonly ValidKey[] | null
-	/** Post-cursor filter predicates */
-	filters: readonly ((value: T) => boolean)[]
-	/** Sort direction */
-	direction: 'ascending' | 'descending'
-	/** Maximum results to return */
-	limitCount: number | null
-	/** Number of results to skip */
-	offsetCount: number
-}
-
-/** Context needed to execute queries */
-interface QueryContext {
-	/** Store name */
-	storeName: string
-	/** Primary key path */
-	primaryKeyPath: string | null
-	/** Available index names */
-	indexNames: readonly string[]
-	/** Function to get open database */
-	ensureOpen: () => Promise<IDBDatabase>
-}
-
-/**
- * Creates initial query state.
- */
-function createInitialState<T>(): QueryState<T> {
-	return {
-		keyPath: null,
-		range: null,
-		anyOfValues: null,
-		filters: [],
-		direction: 'ascending',
-		limitCount: null,
-		offsetCount: 0,
-	}
-}
 
 /**
  * Query Builder implementation.
@@ -71,7 +28,7 @@ export class QueryBuilder<T> implements QueryBuilderInterface<T> {
 
 	constructor(context: QueryContext, state?: QueryState<T>) {
 		this.#context = context
-		this.#state = state ?? createInitialState<T>()
+		this.#state = state ?? createInitialQueryState<T>()
 	}
 
 	// ─── Query Building ──────────────────────────────────────

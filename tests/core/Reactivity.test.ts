@@ -385,6 +385,7 @@ describe('Reactivity', () => {
 				type: 'set',
 				keys: ['u-remote'],
 				source: 'local', // Will be changed to 'remote' on receive
+				timestamp: Date.now(),
 			}
 
 			channel.postMessage(remoteEvent)

@@ -40,6 +40,7 @@ import {
 	lastDaysRange,
 	todayRange,
 	dateRange,
+	createInitialQueryState,
 } from '../src/helpers.js'
 
 // ============================================================================
@@ -895,5 +896,38 @@ describe('dateRange', () => {
 
 		expect(range.includes(end.getTime())).toBe(false)
 		expect(range.includes(end.getTime() - 1)).toBe(true)
+	})
+})
+
+// ============================================================================
+// createInitialQueryState
+// ============================================================================
+
+describe('createInitialQueryState', () => {
+	it('returns object with default values', () => {
+		const state = createInitialQueryState<unknown>()
+
+		expect(state.keyPath).toBe(null)
+		expect(state.range).toBe(null)
+		expect(state.anyOfValues).toBe(null)
+		expect(state.filters).toEqual([])
+		expect(state.direction).toBe('ascending')
+		expect(state.limitCount).toBe(null)
+		expect(state.offsetCount).toBe(0)
+	})
+
+	it('returns a new object each time', () => {
+		const state1 = createInitialQueryState<unknown>()
+		const state2 = createInitialQueryState<unknown>()
+
+		expect(state1).not.toBe(state2)
+		expect(state1).toEqual(state2)
+	})
+
+	it('returns object with empty filters array', () => {
+		const state = createInitialQueryState<{ id: string }>()
+
+		expect(Array.isArray(state.filters)).toBe(true)
+		expect(state.filters.length).toBe(0)
 	})
 })

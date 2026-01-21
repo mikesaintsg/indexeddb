@@ -645,3 +645,29 @@ export function dateRange(
 		options?.upperOpen ?? false,
 	)
 }
+
+// ============================================================================
+// Query Builder Helpers
+// ============================================================================
+
+/**
+ * Creates initial query state for QueryBuilder.
+ *
+ * @returns Fresh QueryState with default values
+ *
+ * @example
+ * ```ts
+ * const state = createInitialQueryState<User>()
+ * ```
+ */
+export function createInitialQueryState<T>(): import('./types.js').QueryState<T> {
+	return {
+		keyPath: null,
+		range: null,
+		anyOfValues: null,
+		filters: [],
+		direction: 'ascending',
+		limitCount: null,
+		offsetCount: 0,
+	}
+}

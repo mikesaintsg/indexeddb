@@ -23,7 +23,7 @@ import type { StoreDefinition, TransactionDurability } from './types.js'
  * - `autoIncrement: false` — Prefer explicit IDs (UUIDs)
  * - `indexes: []` — No indexes by default
  */
-export const DEFAULT_STORE_DEFINITION: Required<StoreDefinition> = {
+export const DEFAULT_STORE_DEFINITION: Omit<Required<StoreDefinition>, 'ttl'> = {
 	keyPath: 'id',
 	autoIncrement: false,
 	indexes: [],

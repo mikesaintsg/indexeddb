@@ -10,7 +10,8 @@
  * - Transaction Atomicity: Visual demonstration of atomic operations
  */
 
-import type { DatabaseInterface, ChangeEvent, Unsubscribe } from '~/src/types.js'
+import type { Unsubscribe } from '@mikesaintsg/core'
+import type { DatabaseInterface, ChangeEvent } from '@mikesaintsg/indexeddb'
 import type { AppSchema, User, Setting } from './types.js'
 import { SAMPLE_USERS, SAMPLE_POSTS, SAMPLE_SETTINGS } from './types.js'
 

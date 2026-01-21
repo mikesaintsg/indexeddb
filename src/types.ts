@@ -1,21 +1,21 @@
 /**
  * @mikesaintsg/indexeddb
  *
- * Type definitions for the IndexedDB library. 
+ * Type definitions for the IndexedDB library.
  * All public types and interfaces are defined here as the SOURCE OF TRUTH.
  */
 
 // ============================================================================
-// Utility Types
+// Imports from @mikesaintsg/core (DO NOT RE-EXPORT)
 // ============================================================================
 
-/** Cleanup function returned by event subscriptions */
-export type Unsubscribe = () => void
-
-/** Converts subscription methods to hook callbacks for options */
-export type SubscriptionToHook<T> = {
-	[K in keyof T]?: T[K] extends (callback: infer CB) => Unsubscribe ? CB : never
-}
+import type {
+	SubscriptionToHook,
+	ChangeSource,
+	PruneResult,
+	StorageInfo,
+	Unsubscribe,
+} from '@mikesaintsg/core'
 
 // ============================================================================
 // Key Types
@@ -45,23 +45,32 @@ export interface DatabaseInfo {
 export type DatabaseErrorCode =
 	| 'NOT_FOUND'
 	| 'CONSTRAINT'
+	| 'CONSTRAINT_ERROR'
 	| 'DATA'
+	| 'DATA_ERROR'
 	| 'TRANSACTION_INACTIVE'
+	| 'TRANSACTION_ABORTED'
 	| 'READ_ONLY'
 	| 'VERSION'
+	| 'VERSION_ERROR'
 	| 'ABORT'
 	| 'TIMEOUT'
 	| 'QUOTA_EXCEEDED'
 	| 'UNKNOWN'
+	| 'UNKNOWN_ERROR'
 	| 'INVALID_STATE'
 	| 'INVALID_ACCESS'
+	| 'OPEN_FAILED'
+	| 'UPGRADE_FAILED'
+	| 'UPGRADE_BLOCKED'
 
-/** Base database error interface */
+/** Database error data interface */
 export interface DatabaseErrorData {
 	readonly code: DatabaseErrorCode
+	readonly message: string
+	readonly cause?: unknown
 	readonly storeName?: string
 	readonly key?: ValidKey
-	readonly cause?: Error
 }
 
 // ============================================================================
@@ -82,13 +91,13 @@ export interface IndexDefinition {
 /** TTL options for automatic expiration */
 export interface TTLOptions {
 	/**
-	 * Field that stores expiration timestamp. 
+	 * Field that stores expiration timestamp.
 	 * If not specified, internal `_expiresAt` field is used.
 	 */
 	readonly field?: string
 	/**
 	 * Default TTL in milliseconds.
-	 * Individual records can override via SetOptions.
+	 * Individual records can override via IndexedDBSetOptions.
 	 */
 	readonly defaultMs?: number
 }
@@ -168,12 +177,12 @@ export interface BulkOperationOptions {
 	readonly onProgress?:  (completed: number, total: number) => void
 }
 
-/** Set operation options */
-export interface SetOptions {
+/** IndexedDB set operation options */
+export interface IndexedDBSetOptions {
 	/**
 	 * Override default TTL for this record.
 	 * Use `null` to disable expiration for this record.
-	 * Use `undefined` to use store default. 
+	 * Use `undefined` to use store default.
 	 */
 	readonly ttl?: number | null
 }
@@ -185,14 +194,12 @@ export interface SetOptions {
 /** Change operation type */
 export type ChangeType = 'set' | 'add' | 'remove' | 'clear'
 
-/** Source of change event */
-export type ChangeSource = 'local' | 'remote'
-
 /** Change event emitted when data is modified */
 export interface ChangeEvent {
 	readonly type: ChangeType
 	readonly storeName: string
-	readonly key?:  ValidKey
+	readonly key?: ValidKey
+	readonly keys?: readonly ValidKey[]
 	readonly value?: unknown
 	readonly source: ChangeSource
 	readonly timestamp: number
@@ -222,7 +229,7 @@ export type VersionChangeCallback = (event: {
 
 /** Migration context passed to migration functions */
 export interface MigrationContext {
-	readonly db: IDBDatabase
+	readonly database: IDBDatabase
 	readonly transaction: IDBTransaction
 	readonly oldVersion: number
 	readonly newVersion: number
@@ -296,6 +303,10 @@ export interface DatabaseOptions<Schema extends DatabaseSchema>
 	readonly version: number
 	readonly stores: StoreDefinitions<Schema>
 	readonly migrations?: readonly Migration[]
+	/** Callback when upgrade is blocked by other connections */
+	readonly onBlocked?: BlockedCallback
+	/** Enable cross-tab synchronization via BroadcastChannel (default: true) */
+	readonly crossTabSync?: boolean
 }
 
 // ============================================================================
@@ -305,7 +316,8 @@ export interface DatabaseOptions<Schema extends DatabaseSchema>
 /** Exported data format */
 export interface ExportedData<Schema extends DatabaseSchema> {
 	readonly version: number
-	readonly exportedAt: number
+	readonly exportedAt: string
+	readonly name: string
 	readonly databaseName: string
 	readonly databaseVersion: number
 	readonly stores: {
@@ -316,29 +328,9 @@ export interface ExportedData<Schema extends DatabaseSchema> {
 /** Import options */
 export interface ImportOptions {
 	readonly clearExisting?: boolean
+	/** Import mode: 'merge' keeps existing, 'replace' clears store first */
+	readonly mode?: 'merge' | 'replace'
 	readonly onProgress?: (storeName: string, completed: number, total: number) => void
-}
-
-// ============================================================================
-// Storage Types
-// ============================================================================
-
-/** Storage estimate information */
-export interface StorageEstimate {
-	readonly usage: number
-	readonly quota: number
-	readonly available: number
-	readonly percentUsed: number
-}
-
-// ============================================================================
-// Prune Types
-// ============================================================================
-
-/** Prune result information */
-export interface PruneResult {
-	readonly prunedCount: number
-	readonly remainingCount: number
 }
 
 // ============================================================================
@@ -346,7 +338,7 @@ export interface PruneResult {
 // ============================================================================
 
 /**
- * Database interface - main entry point for IndexedDB operations. 
+ * Database interface - main entry point for IndexedDB operations.
  *
  * Provides type-safe access to object stores, transactions,
  * and database lifecycle management.
@@ -425,7 +417,7 @@ export interface DatabaseInterface<Schema extends DatabaseSchema>
 	// ---- Storage ----
 
 	/** Get storage usage estimate */
-	getStorageEstimate(): Promise<StorageEstimate>
+	getStorageEstimate(): Promise<StorageInfo>
 }
 
 /**
@@ -495,7 +487,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	 * @param value - Record value
 	 * @param options - Set options including TTL override
 	 */
-	set(value: T, options:  SetOptions): Promise<ValidKey>
+	set(value: T, options: IndexedDBSetOptions): Promise<ValidKey>
 
 	/**
 	 * Insert or update multiple records.
@@ -514,7 +506,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	add(value: T, key?: ValidKey): Promise<ValidKey>
 
 	/**
-	 * Insert multiple new records. 
+	 * Insert multiple new records.
 	 * @param values - Record values
 	 * @param options - Bulk operation options
 	 */
@@ -568,7 +560,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	clear(): Promise<void>
 
 	/**
-	 * Count records. 
+	 * Count records.
 	 * @param query - Optional key range or key
 	 */
 	count(query?: IDBKeyRange | ValidKey | null): Promise<number>
@@ -596,7 +588,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	// ---- Index Access ----
 
 	/**
-	 * Get an index interface. 
+	 * Get an index interface.
 	 * @param name - Index name
 	 */
 	index(name: string): IndexInterface<T>
@@ -624,7 +616,7 @@ export interface StoreInterface<T> extends StoreSubscriptions {
 	openCursor(options?: CursorOptions): Promise<CursorInterface<T> | null>
 
 	/**
-	 * Open a key cursor. 
+	 * Open a key cursor.
 	 * @param options - Cursor options
 	 */
 	openKeyCursor(options?: CursorOptions): Promise<KeyCursorInterface | null>
@@ -656,7 +648,7 @@ export interface IndexInterface<T> {
 	// ---- Get Operations ----
 
 	/**
-	 * Get record by index key. 
+	 * Get record by index key.
 	 * @param key - Index key
 	 */
 	get(key: ValidKey): Promise<T | undefined>
@@ -702,7 +694,7 @@ export interface IndexInterface<T> {
 	// ---- Bulk Retrieval ----
 
 	/**
-	 * Get all records by index. 
+	 * Get all records by index.
 	 * @param query - Optional key range
 	 * @param count - Optional maximum count
 	 */
@@ -1070,7 +1062,7 @@ export interface WhereClauseInterface<T> {
 	lessThanOrEqual(value:  ValidKey): QueryBuilderInterface<T>
 
 	/**
-	 * Range query. 
+	 * Range query.
 	 * @param lower - Lower bound
 	 * @param upper - Upper bound
 	 * @param options - Bound inclusivity options
@@ -1120,4 +1112,34 @@ export interface Deferred<T> {
 	readonly promise: Promise<T>
 	resolve(value: T): void
 	reject(error: Error): void
+}
+
+/** Internal query state for QueryBuilder */
+export interface QueryState<T> {
+	/** Key path being queried (primary key or index) */
+	readonly keyPath: string | null
+	/** IDBKeyRange for indexed query */
+	readonly range: IDBKeyRange | null
+	/** Array of values for anyOf queries */
+	readonly anyOfValues: readonly ValidKey[] | null
+	/** Post-cursor filter predicates */
+	readonly filters: readonly ((value: T) => boolean)[]
+	/** Sort direction */
+	readonly direction: 'ascending' | 'descending'
+	/** Maximum results to return */
+	readonly limitCount: number | null
+	/** Number of results to skip */
+	readonly offsetCount: number
+}
+
+/** Context needed to execute queries */
+export interface QueryContext {
+	/** Store name */
+	readonly storeName: string
+	/** Primary key path */
+	readonly primaryKeyPath: string | null
+	/** Available index names */
+	readonly indexNames: readonly string[]
+	/** Function to get open database */
+	readonly ensureOpen: () => Promise<IDBDatabase>
 }

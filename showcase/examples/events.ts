@@ -10,7 +10,8 @@
  * - onClose() - Close events
  */
 
-import type { DatabaseInterface, Unsubscribe } from '~/src/types.js'
+import type { Unsubscribe } from '@mikesaintsg/core'
+import type { DatabaseInterface } from '@mikesaintsg/indexeddb'
 import type { AppSchema, ExampleResult, EventLogEntry } from './types.js'
 
 // Event log for demonstration

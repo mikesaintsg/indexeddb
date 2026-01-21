@@ -8,12 +8,14 @@
  * @packageDocumentation
  */
 
+import type { PruneResult, Unsubscribe } from '@mikesaintsg/core'
 import type {
 	BulkOperationOptions,
 	ChangeEvent,
 	CursorInterface,
 	CursorOptions,
 	DatabaseSchema,
+	IndexedDBSetOptions,
 	IndexInterface,
 	IterateOptions,
 	KeyCursorInterface,
@@ -21,7 +23,6 @@ import type {
 	QueryBuilderInterface,
 	StoreDefinition,
 	StoreInterface,
-	Unsubscribe,
 	ValidKey,
 } from '../types.js'
 import type { Database } from './Database.js'
@@ -73,6 +74,10 @@ export class Store<T> implements StoreInterface<T> {
 		return this.#definition.autoIncrement ?? DEFAULT_AUTO_INCREMENT
 	}
 
+	hasTTL(): boolean {
+		return this.#definition.ttl !== undefined
+	}
+
 	// ─── Get ─────────────────────────────────────────────────
 
 	get(key: ValidKey): Promise<T | undefined>
@@ -83,12 +88,22 @@ export class Store<T> implements StoreInterface<T> {
 		const store = tx.objectStore(this.#name)
 
 		if (Array.isArray(keyOrKeys)) {
-			return await Promise.all(
+			const results = await Promise.all(
 				keyOrKeys.map(k => this.#request(store.get(k)) as Promise<T | undefined>),
 			)
+			// Filter expired records if TTL is enabled
+			if (this.hasTTL()) {
+				return results.map(r => (r !== undefined && this.#isRecordExpired(r)) ? undefined : r)
+			}
+			return results
 		}
 
-		return this.#request(store.get(keyOrKeys as IDBValidKey)) as Promise<T | undefined>
+		const result = await this.#request(store.get(keyOrKeys as IDBValidKey)) as T | undefined
+		// Filter expired record if TTL is enabled
+		if (result !== undefined && this.hasTTL() && this.#isRecordExpired(result)) {
+			return undefined
+		}
+		return result
 	}
 
 	// ─── Resolve ─────────────────────────────────────────────
@@ -140,10 +155,11 @@ export class Store<T> implements StoreInterface<T> {
 	// ─── Set ─────────────────────────────────────────────────
 
 	set(value: T, key?: ValidKey): Promise<ValidKey>
+	set(value: T, options: IndexedDBSetOptions): Promise<ValidKey>
 	set(values: readonly T[], options?: BulkOperationOptions): Promise<readonly ValidKey[]>
 	async set(
 		valueOrValues: T | readonly T[],
-		keyOrOptions?: ValidKey | BulkOperationOptions,
+		keyOrOptions?: ValidKey | IndexedDBSetOptions | BulkOperationOptions,
 	): Promise<ValidKey | readonly ValidKey[]> {
 		const db = await this.#database.ensureOpen()
 		const tx = db.transaction([this.#name], 'readwrite')
@@ -240,7 +256,14 @@ export class Store<T> implements StoreInterface<T> {
 		const db = await this.#database.ensureOpen()
 		const tx = db.transaction([this.#name], 'readonly')
 		const store = tx.objectStore(this.#name)
-		return this.#request(store.getAll(query ?? undefined, count)) as Promise<readonly T[]>
+		const records = await this.#request(store.getAll(query ?? undefined, count)) as T[]
+
+		// Filter expired records if TTL is enabled
+		if (this.hasTTL()) {
+			return records.filter(record => !this.#isRecordExpired(record))
+		}
+
+		return records
 	}
 
 	async keys(query?: IDBKeyRange | null, count?: number): Promise<readonly ValidKey[]> {
@@ -264,6 +287,81 @@ export class Store<T> implements StoreInterface<T> {
 		const tx = db.transaction([this.#name], 'readonly')
 		const store = tx.objectStore(this.#name)
 		return this.#request(store.count(query as IDBValidKey | IDBKeyRange | undefined))
+	}
+
+	// ─── TTL Operations ──────────────────────────────────────
+
+	async prune(): Promise<PruneResult> {
+		if (!this.hasTTL()) {
+			const count = await this.count()
+			return { prunedCount: 0, remainingCount: count }
+		}
+
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readwrite')
+		const store = tx.objectStore(this.#name)
+
+		const ttlConfig = this.#definition.ttl
+		const expiresField = ttlConfig?.field ?? '_expiresAt'
+		const now = Date.now()
+
+		let prunedCount = 0
+		const prunedKeys: ValidKey[] = []
+
+		const request = store.openCursor()
+		await new Promise<void>((resolve, reject) => {
+			request.onsuccess = () => {
+				const cursor = request.result
+				if (cursor) {
+					const record = cursor.value as Record<string, unknown>
+					const expiresAt = record[expiresField]
+					if (typeof expiresAt === 'number' && expiresAt <= now) {
+						prunedKeys.push(cursor.primaryKey)
+						void cursor.delete()
+						prunedCount++
+					}
+					void cursor.continue()
+				} else {
+					resolve()
+				}
+			}
+			request.onerror = () => reject(request.error ?? new Error('Cursor operation failed'))
+		})
+
+		await this.#awaitTransaction(tx)
+
+		if (prunedCount > 0) {
+			this.#emitChange('remove', prunedKeys)
+		}
+
+		const remainingCount = await this.count()
+		return { prunedCount, remainingCount }
+	}
+
+	async isExpired(key: ValidKey): Promise<boolean> {
+		if (!this.hasTTL()) {
+			return false
+		}
+
+		// Use raw database access to get record without TTL filtering
+		const db = await this.#database.ensureOpen()
+		const tx = db.transaction([this.#name], 'readonly')
+		const store = tx.objectStore(this.#name)
+		const record = await this.#request(store.get(key)) as Record<string, unknown> | undefined
+
+		if (!record) {
+			return false
+		}
+
+		const ttlConfig = this.#definition.ttl
+		const expiresField = ttlConfig?.field ?? '_expiresAt'
+		const expiresAt = record[expiresField]
+
+		if (typeof expiresAt === 'number') {
+			return expiresAt <= Date.now()
+		}
+
+		return false
 	}
 
 	// ─── Index Access ────────────────────────────────────────
@@ -404,13 +502,39 @@ export class Store<T> implements StoreInterface<T> {
 		})
 	}
 
+	/**
+	 * Checks if a record is expired (synchronous check).
+	 * @param record - The record to check
+	 * @returns true if record is expired
+	 */
+	#isRecordExpired(record: T): boolean {
+		if (!this.hasTTL()) {
+			return false
+		}
+
+		const ttlConfig = this.#definition.ttl
+		const expiresField = ttlConfig?.field ?? '_expiresAt'
+		const expiresAt = (record as Record<string, unknown>)[expiresField]
+
+		if (typeof expiresAt === 'number') {
+			return expiresAt <= Date.now()
+		}
+
+		return false
+	}
+
 	#emitChange(type: ChangeEvent['type'], keys: readonly ValidKey[]): void {
-		const event: ChangeEvent = {
+		const firstKey = keys.length > 0 ? keys[0] : undefined
+		const baseEvent = {
 			storeName: this.#name,
 			type,
 			keys,
-			source: 'local',
+			source: 'local' as const,
+			timestamp: Date.now(),
 		}
+		const event: ChangeEvent = firstKey !== undefined
+			? { ...baseEvent, key: firstKey }
+			: baseEvent
 
 		for (const callback of this.#changeListeners) {
 			try { callback(event) } catch { /* ignore */ }

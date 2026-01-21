@@ -50,16 +50,16 @@
 
 ### When to Use IndexedDB
 
-| Use Case | Recommendation |
-|----------|----------------|
-| Simple key-value storage | Use `@mikesaintsg/storage` instead |
-| Structured data with queries | ✅ Use indexeddb |
-| Large datasets (1000+ records) | ✅ Use indexeddb |
-| Offline-first applications | ✅ Use indexeddb |
-| Complex relationships | ✅ Use indexeddb |
-| Session-only data | Use `sessionStorage` via storage |
-| Cross-tab real-time sync | Combine with `@mikesaintsg/broadcast` |
-| Cache with automatic expiration | ✅ Use indexeddb with TTL |
+| Use Case                        | Recommendation                        |
+|---------------------------------|---------------------------------------|
+| Simple key-value storage        | Use `@mikesaintsg/storage` instead    |
+| Structured data with queries    | ✅ Use indexeddb                       |
+| Large datasets (1000+ records)  | ✅ Use indexeddb                       |
+| Offline-first applications      | ✅ Use indexeddb                       |
+| Complex relationships           | ✅ Use indexeddb                       |
+| Session-only data               | Use `sessionStorage` via storage      |
+| Cross-tab real-time sync        | Combine with `@mikesaintsg/broadcast` |
+| Cache with automatic expiration | ✅ Use indexeddb with TTL              |
 
 ---
 
@@ -199,16 +199,16 @@ interface IndexDefinition {
 
 This library follows consistent naming conventions:
 
-| Method | Returns | When Not Found | Use Case |
-|--------|---------|----------------|----------|
-| `get(key)` | `T \| undefined` | Returns `undefined` | Optional lookup |
-| `resolve(key)` | `T` | Throws `NotFoundError` | Required lookup |
-| `has(key)` | `boolean` | Returns `false` | Existence check |
-| `set(value)` | `ValidKey` | Creates new | Insert or update |
-| `add(value)` | `ValidKey` | Creates new | Insert only (throws if exists) |
-| `remove(key)` | `void` | No-op | Delete |
-| `all()` | `readonly T[]` | Empty array | Bulk retrieval |
-| `prune()` | `PruneResult` | N/A | Remove expired records (TTL stores) |
+| Method         | Returns          | When Not Found         | Use Case                            |
+|----------------|------------------|------------------------|-------------------------------------|
+| `get(key)`     | `T \| undefined` | Returns `undefined`    | Optional lookup                     |
+| `resolve(key)` | `T`              | Throws `NotFoundError` | Required lookup                     |
+| `has(key)`     | `boolean`        | Returns `false`        | Existence check                     |
+| `set(value)`   | `ValidKey`       | Creates new            | Insert or update                    |
+| `add(value)`   | `ValidKey`       | Creates new            | Insert only (throws if exists)      |
+| `remove(key)`  | `void`           | No-op                  | Delete                              |
+| `all()`        | `readonly T[]`   | Empty array            | Bulk retrieval                      |
+| `prune()`      | `PruneResult`    | N/A                    | Remove expired records (TTL stores) |
 
 ---
 
@@ -257,7 +257,7 @@ const data = await db.export()
 await db.import(data)
 
 // Storage info
-const estimate = await db.getStorageEstimate()
+const storageInfo = await db.getStorageEstimate()
 ```
 
 ### Native Access
@@ -287,7 +287,7 @@ if (user) {
 }
 
 // Batch get
-const users = await db. store('users').get(['id1', 'id2', 'id3'])
+const users = await db.store('users').get(['id1', 'id2', 'id3'])
 // Returns: readonly (User | undefined)[]
 ```
 
@@ -403,10 +403,10 @@ const recentUsers = await db.store('users').all(
 const firstTen = await db.store('users').all(null, 10)
 
 // Get all keys
-const allKeys = await db. store('users').keys()
+const allKeys = await db.store('users').keys()
 
 // Count records
-const count = await db. store('users').count()
+const count = await db.store('users').count()
 
 // Count with query
 const recentCount = await db.store('users').count(
@@ -423,7 +423,7 @@ await db.store('users').clear()
 const store = db.store('users')
 
 store.getName()          // 'users'
-store. getKeyPath()       // 'id' or null for out-of-line keys
+store.getKeyPath()       // 'id' or null for out-of-line keys
 store.getIndexNames()    // readonly string[]
 store.hasAutoIncrement() // boolean
 store.hasTTL()           // boolean
@@ -445,7 +445,7 @@ const emailIndex = db.store('users').index('email')
 
 ```ts
 // Get by index key
-const user = await emailIndex.get('alice@example. com')
+const user = await emailIndex.get('alice@example.com')
 
 // Batch get by index keys
 const users = await emailIndex.get(['alice@example.com', 'bob@example.com'])
@@ -467,7 +467,7 @@ const allByEmail = await emailIndex.all()
 
 // Get all with query
 const gmailUsers = await emailIndex.all(
-	IDBKeyRange. bound('a@gmail.com', 'z@gmail.com')
+	IDBKeyRange.bound('a@gmail.com', 'z@gmail.com')
 )
 
 // Get all keys
@@ -617,7 +617,7 @@ const count = await query.count()
 const keys = await query.keys()
 
 // Iterate (memory-efficient for large results)
-for await (const record of query. iterate()) {
+for await (const record of query.iterate()) {
 	console.log(record)
 }
 ```
@@ -632,7 +632,7 @@ Most store operations create implicit transactions:
 
 ```ts
 // Each operation runs in its own transaction
-await db. store('users').set(user1)
+await db.store('users').set(user1)
 await db.store('users').set(user2)
 ```
 
@@ -672,10 +672,10 @@ await db.write(['users'], async (tx) => {
 })
 ```
 
-| Durability | Behavior |
-|------------|----------|
-| `'default'` | Browser decides based on context |
-| `'strict'` | Wait for disk write (slower, safer) |
+| Durability  | Behavior                                  |
+|-------------|-------------------------------------------|
+| `'default'` | Browser decides based on context          |
+| `'strict'`  | Wait for disk write (slower, safer)       |
 | `'relaxed'` | May not wait for disk (faster, less safe) |
 
 ### Transaction Methods
@@ -827,7 +827,7 @@ interface TTLOptions {
 
 	/**
 	 * Default TTL in milliseconds.
-	 * Individual records can override via SetOptions.
+	 * Individual records can override via IndexedDBSetOptions.
 	 */
 	readonly defaultMs?: number
 }
@@ -855,7 +855,7 @@ await db.store('cache').set(
 )
 
 // Disable expiration for specific record
-await db. store('cache').set(
+await db.store('cache').set(
 	{ key: 'permanent', data: neverExpires },
 	{ ttl: null }
 )
@@ -953,9 +953,9 @@ const db = await createDatabase<ApiCacheSchema>({
 
 async function fetchWithCache(url: string, ttlMs?:  number): Promise<unknown> {
 	// Check cache first
-	const cached = await db. store('responses').get(url)
+	const cached = await db.store('responses').get(url)
 	if (cached) {
-		return cached. response
+		return cached.response
 	}
 
 	// Fetch fresh data
@@ -1369,20 +1369,20 @@ class DatabaseError extends Error {
 
 ### Error Codes
 
-| Code | Cause |
-|------|-------|
-| `NOT_FOUND` | Record doesn't exist (from `resolve()`) |
-| `CONSTRAINT` | Unique constraint violated (from `add()` or unique index) |
-| `DATA` | Invalid data for IndexedDB (e.g., functions, symbols) |
-| `TRANSACTION_INACTIVE` | Transaction already completed |
-| `READ_ONLY` | Write operation in read-only transaction |
-| `VERSION` | Version mismatch during upgrade |
-| `ABORT` | Transaction was aborted |
-| `TIMEOUT` | Operation timed out |
-| `QUOTA_EXCEEDED` | Storage quota exceeded |
-| `INVALID_STATE` | Database not open or connection lost |
-| `INVALID_ACCESS` | Invalid operation for current state |
-| `UNKNOWN` | Unknown or uncategorized error |
+| Code                   | Cause                                                     |
+|------------------------|-----------------------------------------------------------|
+| `NOT_FOUND`            | Record doesn't exist (from `resolve()`)                   |
+| `CONSTRAINT`           | Unique constraint violated (from `add()` or unique index) |
+| `DATA`                 | Invalid data for IndexedDB (e.g., functions, symbols)     |
+| `TRANSACTION_INACTIVE` | Transaction already completed                             |
+| `READ_ONLY`            | Write operation in read-only transaction                  |
+| `VERSION`              | Version mismatch during upgrade                           |
+| `ABORT`                | Transaction was aborted                                   |
+| `TIMEOUT`              | Operation timed out                                       |
+| `QUOTA_EXCEEDED`       | Storage quota exceeded                                    |
+| `INVALID_STATE`        | Database not open or connection lost                      |
+| `INVALID_ACCESS`       | Invalid operation for current state                       |
+| `UNKNOWN`              | Unknown or uncategorized error                            |
 
 ### Handling Errors
 
@@ -1400,12 +1400,12 @@ try {
 				await db.store('users').set(user)
 				break
 			case 'QUOTA_EXCEEDED':
-				console. log('Storage full, pruning old data')
+				console.log('Storage full, pruning old data')
 				await db.store('cache').prune()
 				await db.store('cache').clear()
 				break
 			case 'NOT_FOUND':
-				console. log(`Record not found: ${error.key}`)
+				console.log(`Record not found: ${error.key}`)
 				break
 			default: 
 				throw error
@@ -1545,7 +1545,7 @@ db.store('invalid') // ❌ TypeScript error
 // Key type validation
 await db.store('users').get('user-123')     // ✅ string is ValidKey
 await db.store('users').get(123)            // ✅ number is ValidKey
-await db. store('users').get(new Date())     // ✅ Date is ValidKey
+await db.store('users').get(new Date())     // ✅ Date is ValidKey
 await db.store('users').get(['a', 'b'])     // ✅ array is ValidKey
 await db.store('users').get({ obj: 1 })     // ❌ object is not ValidKey
 ```
@@ -1602,7 +1602,7 @@ const user = await db.store('users')
 const results = await db.store('users')
 	.query()
 	.where('createdAt').greaterThan(lastWeek) // Index narrows results
-	.filter((u) => u.name. includes('Smith'))   // Filter refines
+	.filter((u) => u.name.includes('Smith'))   // Filter refines
 	.toArray()
 ```
 
@@ -1701,7 +1701,7 @@ await db.import(data, {
 ### Checking Storage Usage
 
 ```ts
-const estimate = await db.getStorageEstimate()
+const storageInfo = await db.getStorageEstimate()
 // {
 //   usage: 1234567,       // Bytes currently used
 //   quota: 1073741824,    // Total quota available
@@ -1709,7 +1709,7 @@ const estimate = await db.getStorageEstimate()
 //   percentUsed: 0.115,   // Usage as percentage (0-1)
 // }
 
-if (estimate.percentUsed > 0.9) {
+if (storageInfo.percentUsed > 0.9) {
 	console.warn('Storage nearly full!')
 	// Prune caches, delete old data, etc.
 }
@@ -1766,7 +1766,7 @@ Compound keys are compared element by element:
 // ['a', 1] < ['a', 2] < ['b', 1]
 
 // Query all entries for user-123, any date
-const events = await db. store('events')
+const events = await db.store('events')
 	.index('userDate')
 	.all(IDBKeyRange.bound(
 		['user-123'],           // Lower bound
@@ -1830,6 +1830,102 @@ await db.write(['users', 'posts'], async (tx) => {
 
 ---
 
+## Integration with Ecosystem
+
+### With @mikesaintsg/inference (Session Persistence)
+
+Use `createSessionPersistence` from `@mikesaintsg/core` to persist inference sessions:
+
+```ts
+import { createSessionPersistence } from '@mikesaintsg/core'
+import { createDatabase } from '@mikesaintsg/indexeddb'
+import { createEngine } from '@mikesaintsg/inference'
+
+interface SessionsSchema {
+	sessions: {
+		id: string
+		messages: readonly SerializedMessage[]
+		metadata: SessionMetadata
+		updatedAt: number
+	}
+}
+
+const db = await createDatabase<SessionsSchema>({
+	name: 'my-app',
+	version: 1,
+	stores: {
+		sessions: { keyPath: 'id' },
+	},
+})
+
+const persistence = createSessionPersistence({
+	database: db,
+	storeName: 'sessions',
+	autoprune: 7 * 24 * 60 * 60 * 1000, // 7 days
+})
+
+// Required adapter is first parameter
+const engine = createEngine(provider)
+
+// Load or create session
+const sessionId = 'user-main'
+const existingData = await persistence.load(sessionId)
+
+const session = existingData
+	? engine.restoreSession(existingData)
+	: engine.createSession({ system: 'You are helpful.' })
+
+// Auto-save on changes
+session.onMessageAdded(async () => {
+	await persistence.save(sessionId, session)
+})
+```
+
+The persistence interface provides:
+
+| Method              | Description                              |
+|---------------------|------------------------------------------|
+| `save(id, session)` | Save session state                       |
+| `load(id)`          | Load session or return `undefined`       |
+| `delete(id)`        | Remove session                           |
+| `list()`            | Get all session IDs                      |
+| `prune(maxAgeMs)`   | Delete sessions older than specified age |
+
+### With @mikesaintsg/vectorstore
+
+IndexedDB provides the persistence layer for vectorstore:
+
+```ts
+import { createDatabase } from '@mikesaintsg/indexeddb'
+import { createVectorStore } from '@mikesaintsg/vectorstore'
+import { createIndexedDBPersistenceAdapter, createOpenAIEmbeddingAdapter } from '@mikesaintsg/core'
+
+const embeddingAdapter = createOpenAIEmbeddingAdapter({
+	apiKey: process.env.OPENAI_API_KEY,
+	model: 'text-embedding-3-small',
+})
+
+const db = await createDatabase<VectorSchema>({
+	name: 'vectors',
+	version: 1,
+	stores: {
+		documents: { keyPath: 'id' },
+	},
+})
+
+// Persistence adapter from core
+const persistence = createIndexedDBPersistenceAdapter({ database: db })
+
+const vectorStore = await createVectorStore({
+	embedding: embeddingAdapter,
+	persistence,
+})
+
+await vectorStore.load()
+```
+
+---
+
 ## API Reference
 
 ### Factory Functions
@@ -1860,184 +1956,184 @@ const db = await createDatabase<MySchema>({
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type          | Description            |
+|----------|---------------|------------------------|
 | `native` | `IDBDatabase` | Native database handle |
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getName()` | `string` | Database name |
-| `getVersion()` | `number` | Database version |
-| `getStoreNames()` | `readonly string[]` | All store names |
-| `isOpen()` | `boolean` | Connection status |
-| `store(name)` | `StoreInterface<T>` | Get store interface |
-| `read(stores, op)` | `Promise<void>` | Read-only transaction |
-| `write(stores, op, opts?)` | `Promise<void>` | Read-write transaction |
-| `close()` | `void` | Close connection |
-| `drop()` | `Promise<void>` | Delete database |
-| `export()` | `Promise<ExportedData>` | Export all data |
-| `import(data, opts?)` | `Promise<void>` | Import data |
-| `getStorageEstimate()` | `Promise<StorageEstimate>` | Storage usage |
-| `onChange(cb)` | `Unsubscribe` | Subscribe to changes |
-| `onError(cb)` | `Unsubscribe` | Subscribe to errors |
-| `onVersionChange(cb)` | `Unsubscribe` | Subscribe to version changes |
-| `onClose(cb)` | `Unsubscribe` | Subscribe to close |
+| Method                     | Returns                 | Description                  |
+|----------------------------|-------------------------|------------------------------|
+| `getName()`                | `string`                | Database name                |
+| `getVersion()`             | `number`                | Database version             |
+| `getStoreNames()`          | `readonly string[]`     | All store names              |
+| `isOpen()`                 | `boolean`               | Connection status            |
+| `store(name)`              | `StoreInterface<T>`     | Get store interface          |
+| `read(stores, op)`         | `Promise<void>`         | Read-only transaction        |
+| `write(stores, op, opts?)` | `Promise<void>`         | Read-write transaction       |
+| `close()`                  | `void`                  | Close connection             |
+| `drop()`                   | `Promise<void>`         | Delete database              |
+| `export()`                 | `Promise<ExportedData>` | Export all data              |
+| `import(data, opts?)`      | `Promise<void>`         | Import data                  |
+| `getStorageEstimate()`     | `Promise<StorageInfo>`  | Storage usage                |
+| `onChange(cb)`             | `Unsubscribe`           | Subscribe to changes         |
+| `onError(cb)`              | `Unsubscribe`           | Subscribe to errors          |
+| `onVersionChange(cb)`      | `Unsubscribe`           | Subscribe to version changes |
+| `onClose(cb)`              | `Unsubscribe`           | Subscribe to close           |
 
 ### StoreInterface\<T\>
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type             | Description         |
+|----------|------------------|---------------------|
 | `native` | `IDBObjectStore` | Native store handle |
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getName()` | `string` | Store name |
-| `getKeyPath()` | `KeyPath \| null` | Key path |
-| `getIndexNames()` | `readonly string[]` | Index names |
-| `hasAutoIncrement()` | `boolean` | Auto-increment enabled |
-| `hasTTL()` | `boolean` | TTL enabled |
-| `get(key)` | `Promise<T \| undefined>` | Optional lookup |
-| `get(keys)` | `Promise<readonly (T \| undefined)[]>` | Batch lookup |
-| `resolve(key)` | `Promise<T>` | Required lookup |
-| `resolve(keys)` | `Promise<readonly T[]>` | Batch required lookup |
-| `set(value, key?)` | `Promise<ValidKey>` | Insert or update |
-| `set(value, opts)` | `Promise<ValidKey>` | Insert with options |
-| `set(values, opts?)` | `Promise<readonly ValidKey[]>` | Batch insert |
-| `add(value, key?)` | `Promise<ValidKey>` | Insert only |
-| `add(values, opts?)` | `Promise<readonly ValidKey[]>` | Batch insert only |
-| `remove(key)` | `Promise<void>` | Delete |
-| `remove(keys)` | `Promise<void>` | Batch delete |
-| `has(key)` | `Promise<boolean>` | Existence check |
-| `has(keys)` | `Promise<readonly boolean[]>` | Batch existence |
-| `all(query?, count?)` | `Promise<readonly T[]>` | Get all |
-| `keys(query?, count?)` | `Promise<readonly ValidKey[]>` | Get all keys |
-| `clear()` | `Promise<void>` | Remove all |
-| `count(query?)` | `Promise<number>` | Count records |
-| `prune()` | `Promise<PruneResult>` | Remove expired (TTL) |
-| `isExpired(key)` | `Promise<boolean>` | Check expiration (TTL) |
-| `query()` | `QueryBuilderInterface<T>` | Create query |
-| `index(name)` | `IndexInterface<T>` | Get index |
-| `iterate(opts?)` | `AsyncGenerator<T>` | Iterate records |
-| `iterateKeys(opts?)` | `AsyncGenerator<ValidKey>` | Iterate keys |
-| `openCursor(opts?)` | `Promise<CursorInterface<T> \| null>` | Open cursor |
-| `openKeyCursor(opts?)` | `Promise<KeyCursorInterface \| null>` | Open key cursor |
-| `onChange(cb)` | `Unsubscribe` | Subscribe to changes |
+| Method                 | Returns                                | Description            |
+|------------------------|----------------------------------------|------------------------|
+| `getName()`            | `string`                               | Store name             |
+| `getKeyPath()`         | `KeyPath \| null`                      | Key path               |
+| `getIndexNames()`      | `readonly string[]`                    | Index names            |
+| `hasAutoIncrement()`   | `boolean`                              | Auto-increment enabled |
+| `hasTTL()`             | `boolean`                              | TTL enabled            |
+| `get(key)`             | `Promise<T \| undefined>`              | Optional lookup        |
+| `get(keys)`            | `Promise<readonly (T \| undefined)[]>` | Batch lookup           |
+| `resolve(key)`         | `Promise<T>`                           | Required lookup        |
+| `resolve(keys)`        | `Promise<readonly T[]>`                | Batch required lookup  |
+| `set(value, key?)`     | `Promise<ValidKey>`                    | Insert or update       |
+| `set(value, opts)`     | `Promise<ValidKey>`                    | Insert with options    |
+| `set(values, opts?)`   | `Promise<readonly ValidKey[]>`         | Batch insert           |
+| `add(value, key?)`     | `Promise<ValidKey>`                    | Insert only            |
+| `add(values, opts?)`   | `Promise<readonly ValidKey[]>`         | Batch insert only      |
+| `remove(key)`          | `Promise<void>`                        | Delete                 |
+| `remove(keys)`         | `Promise<void>`                        | Batch delete           |
+| `has(key)`             | `Promise<boolean>`                     | Existence check        |
+| `has(keys)`            | `Promise<readonly boolean[]>`          | Batch existence        |
+| `all(query?, count?)`  | `Promise<readonly T[]>`                | Get all                |
+| `keys(query?, count?)` | `Promise<readonly ValidKey[]>`         | Get all keys           |
+| `clear()`              | `Promise<void>`                        | Remove all             |
+| `count(query?)`        | `Promise<number>`                      | Count records          |
+| `prune()`              | `Promise<PruneResult>`                 | Remove expired (TTL)   |
+| `isExpired(key)`       | `Promise<boolean>`                     | Check expiration (TTL) |
+| `query()`              | `QueryBuilderInterface<T>`             | Create query           |
+| `index(name)`          | `IndexInterface<T>`                    | Get index              |
+| `iterate(opts?)`       | `AsyncGenerator<T>`                    | Iterate records        |
+| `iterateKeys(opts?)`   | `AsyncGenerator<ValidKey>`             | Iterate keys           |
+| `openCursor(opts?)`    | `Promise<CursorInterface<T> \| null>`  | Open cursor            |
+| `openKeyCursor(opts?)` | `Promise<KeyCursorInterface \| null>`  | Open key cursor        |
+| `onChange(cb)`         | `Unsubscribe`                          | Subscribe to changes   |
 
 ### IndexInterface\<T\>
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type       | Description         |
+|----------|------------|---------------------|
 | `native` | `IDBIndex` | Native index handle |
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getName()` | `string` | Index name |
-| `getKeyPath()` | `KeyPath` | Index key path |
-| `isUnique()` | `boolean` | Uniqueness constraint |
-| `isMultiEntry()` | `boolean` | Multi-entry index |
-| `get(key)` | `Promise<T \| undefined>` | Lookup by index key |
-| `get(keys)` | `Promise<readonly (T \| undefined)[]>` | Batch lookup |
-| `resolve(key)` | `Promise<T>` | Required lookup |
-| `resolve(keys)` | `Promise<readonly T[]>` | Batch required |
-| `getKey(key)` | `Promise<ValidKey \| undefined>` | Get primary key |
-| `has(key)` | `Promise<boolean>` | Existence check |
-| `has(keys)` | `Promise<readonly boolean[]>` | Batch existence |
-| `all(query?, count?)` | `Promise<readonly T[]>` | Get all by index |
-| `keys(query?, count?)` | `Promise<readonly ValidKey[]>` | Get all keys |
-| `count(query?)` | `Promise<number>` | Count by index |
-| `query()` | `QueryBuilderInterface<T>` | Create query |
-| `iterate(opts?)` | `AsyncGenerator<T>` | Iterate by index |
-| `iterateKeys(opts?)` | `AsyncGenerator<ValidKey>` | Iterate keys |
-| `openCursor(opts?)` | `Promise<CursorInterface<T> \| null>` | Open cursor |
-| `openKeyCursor(opts?)` | `Promise<KeyCursorInterface \| null>` | Open key cursor |
+| Method                 | Returns                                | Description           |
+|------------------------|----------------------------------------|-----------------------|
+| `getName()`            | `string`                               | Index name            |
+| `getKeyPath()`         | `KeyPath`                              | Index key path        |
+| `isUnique()`           | `boolean`                              | Uniqueness constraint |
+| `isMultiEntry()`       | `boolean`                              | Multi-entry index     |
+| `get(key)`             | `Promise<T \| undefined>`              | Lookup by index key   |
+| `get(keys)`            | `Promise<readonly (T \| undefined)[]>` | Batch lookup          |
+| `resolve(key)`         | `Promise<T>`                           | Required lookup       |
+| `resolve(keys)`        | `Promise<readonly T[]>`                | Batch required        |
+| `getKey(key)`          | `Promise<ValidKey \| undefined>`       | Get primary key       |
+| `has(key)`             | `Promise<boolean>`                     | Existence check       |
+| `has(keys)`            | `Promise<readonly boolean[]>`          | Batch existence       |
+| `all(query?, count?)`  | `Promise<readonly T[]>`                | Get all by index      |
+| `keys(query?, count?)` | `Promise<readonly ValidKey[]>`         | Get all keys          |
+| `count(query?)`        | `Promise<number>`                      | Count by index        |
+| `query()`              | `QueryBuilderInterface<T>`             | Create query          |
+| `iterate(opts?)`       | `AsyncGenerator<T>`                    | Iterate by index      |
+| `iterateKeys(opts?)`   | `AsyncGenerator<ValidKey>`             | Iterate keys          |
+| `openCursor(opts?)`    | `Promise<CursorInterface<T> \| null>`  | Open cursor           |
+| `openKeyCursor(opts?)` | `Promise<KeyCursorInterface \| null>`  | Open key cursor       |
 
 ### QueryBuilderInterface\<T\>
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `where(keyPath)` | `WhereClauseInterface<T>` | Start where clause |
-| `filter(predicate)` | `QueryBuilderInterface<T>` | Add filter |
-| `ascending()` | `QueryBuilderInterface<T>` | Sort ascending |
-| `descending()` | `QueryBuilderInterface<T>` | Sort descending |
-| `limit(count)` | `QueryBuilderInterface<T>` | Limit results |
-| `offset(count)` | `QueryBuilderInterface<T>` | Skip results |
-| `getRange()` | `IDBKeyRange \| null` | Get constructed range |
-| `toArray()` | `Promise<readonly T[]>` | Execute and get all |
-| `first()` | `Promise<T \| undefined>` | Execute and get first |
-| `count()` | `Promise<number>` | Execute and count |
-| `keys()` | `Promise<readonly ValidKey[]>` | Execute and get keys |
-| `iterate()` | `AsyncGenerator<T>` | Execute and iterate |
+| Method              | Returns                        | Description           |
+|---------------------|--------------------------------|-----------------------|
+| `where(keyPath)`    | `WhereClauseInterface<T>`      | Start where clause    |
+| `filter(predicate)` | `QueryBuilderInterface<T>`     | Add filter            |
+| `ascending()`       | `QueryBuilderInterface<T>`     | Sort ascending        |
+| `descending()`      | `QueryBuilderInterface<T>`     | Sort descending       |
+| `limit(count)`      | `QueryBuilderInterface<T>`     | Limit results         |
+| `offset(count)`     | `QueryBuilderInterface<T>`     | Skip results          |
+| `getRange()`        | `IDBKeyRange \| null`          | Get constructed range |
+| `toArray()`         | `Promise<readonly T[]>`        | Execute and get all   |
+| `first()`           | `Promise<T \| undefined>`      | Execute and get first |
+| `count()`           | `Promise<number>`              | Execute and count     |
+| `keys()`            | `Promise<readonly ValidKey[]>` | Execute and get keys  |
+| `iterate()`         | `AsyncGenerator<T>`            | Execute and iterate   |
 
 ### WhereClauseInterface\<T\>
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `equals(value)` | `QueryBuilderInterface<T>` | Exact match |
-| `greaterThan(value)` | `QueryBuilderInterface<T>` | Greater than |
-| `greaterThanOrEqual(value)` | `QueryBuilderInterface<T>` | Greater or equal |
-| `lessThan(value)` | `QueryBuilderInterface<T>` | Less than |
-| `lessThanOrEqual(value)` | `QueryBuilderInterface<T>` | Less or equal |
-| `between(lower, upper, opts?)` | `QueryBuilderInterface<T>` | Range query |
-| `startsWith(prefix)` | `QueryBuilderInterface<T>` | String prefix |
-| `endsWith(suffix)` | `QueryBuilderInterface<T>` | String suffix |
-| `anyOf(values)` | `QueryBuilderInterface<T>` | Match any value |
-| `noneOf(values)` | `QueryBuilderInterface<T>` | Match none |
+| Method                         | Returns                    | Description      |
+|--------------------------------|----------------------------|------------------|
+| `equals(value)`                | `QueryBuilderInterface<T>` | Exact match      |
+| `greaterThan(value)`           | `QueryBuilderInterface<T>` | Greater than     |
+| `greaterThanOrEqual(value)`    | `QueryBuilderInterface<T>` | Greater or equal |
+| `lessThan(value)`              | `QueryBuilderInterface<T>` | Less than        |
+| `lessThanOrEqual(value)`       | `QueryBuilderInterface<T>` | Less or equal    |
+| `between(lower, upper, opts?)` | `QueryBuilderInterface<T>` | Range query      |
+| `startsWith(prefix)`           | `QueryBuilderInterface<T>` | String prefix    |
+| `endsWith(suffix)`             | `QueryBuilderInterface<T>` | String suffix    |
+| `anyOf(values)`                | `QueryBuilderInterface<T>` | Match any value  |
+| `noneOf(values)`               | `QueryBuilderInterface<T>` | Match none       |
 
 ### CursorInterface\<T\>
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type                 | Description   |
+|----------|----------------------|---------------|
 | `native` | `IDBCursorWithValue` | Native cursor |
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getKey()` | `ValidKey` | Current key |
-| `getPrimaryKey()` | `ValidKey` | Current primary key |
-| `getValue()` | `T` | Current value |
-| `getDirection()` | `CursorDirection` | Cursor direction |
-| `continue(key?)` | `Promise<CursorInterface<T> \| null>` | Advance cursor |
-| `continuePrimaryKey(key, pk)` | `Promise<CursorInterface<T> \| null>` | Advance to key |
-| `advance(count)` | `Promise<CursorInterface<T> \| null>` | Skip records |
-| `update(value)` | `Promise<ValidKey>` | Update current |
-| `delete()` | `Promise<void>` | Delete current |
+| Method                        | Returns                               | Description         |
+|-------------------------------|---------------------------------------|---------------------|
+| `getKey()`                    | `ValidKey`                            | Current key         |
+| `getPrimaryKey()`             | `ValidKey`                            | Current primary key |
+| `getValue()`                  | `T`                                   | Current value       |
+| `getDirection()`              | `CursorDirection`                     | Cursor direction    |
+| `continue(key?)`              | `Promise<CursorInterface<T> \| null>` | Advance cursor      |
+| `continuePrimaryKey(key, pk)` | `Promise<CursorInterface<T> \| null>` | Advance to key      |
+| `advance(count)`              | `Promise<CursorInterface<T> \| null>` | Skip records        |
+| `update(value)`               | `Promise<ValidKey>`                   | Update current      |
+| `delete()`                    | `Promise<void>`                       | Delete current      |
 
 ### TransactionInterface\<Schema, K\>
 
 #### Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type             | Description        |
+|----------|------------------|--------------------|
 | `native` | `IDBTransaction` | Native transaction |
 
 #### Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getMode()` | `TransactionMode` | Transaction mode |
-| `getStoreNames()` | `readonly string[]` | Stores in scope |
-| `isActive()` | `boolean` | Transaction active |
-| `isFinished()` | `boolean` | Transaction finished |
-| `store(name)` | `TransactionStoreInterface<T>` | Get store |
-| `abort()` | `void` | Abort transaction |
-| `commit()` | `void` | Commit transaction |
+| Method            | Returns                        | Description          |
+|-------------------|--------------------------------|----------------------|
+| `getMode()`       | `TransactionMode`              | Transaction mode     |
+| `getStoreNames()` | `readonly string[]`            | Stores in scope      |
+| `isActive()`      | `boolean`                      | Transaction active   |
+| `isFinished()`    | `boolean`                      | Transaction finished |
+| `store(name)`     | `TransactionStoreInterface<T>` | Get store            |
+| `abort()`         | `void`                         | Abort transaction    |
+| `commit()`        | `void`                         | Commit transaction   |
 
 ### Types
 
@@ -2094,9 +2190,9 @@ await deleteDatabase('my-app')
 import { dateRange } from '@mikesaintsg/indexeddb'
 
 // Create IDBKeyRange for common date ranges
-dateRange. today()              // Today's range
+dateRange.today()              // Today's range
 dateRange.yesterday()          // Yesterday's range
-dateRange. lastDays(7)          // Last 7 days
+dateRange.lastDays(7)          // Last 7 days
 dateRange.thisWeek()           // This week (Sunday-Saturday)
 dateRange.thisMonth()          // This month
 dateRange.thisYear()           // This year

@@ -105,6 +105,7 @@ describe('Integration: Cross-Tab', () => {
 				type: 'set',
 				keys: ['remote-item'],
 				source: 'local', // Sender marks as local
+				timestamp: Date.now(),
 			}
 			channel.postMessage(remoteEvent)
 			channel.close()
@@ -246,11 +247,11 @@ describe('Integration: Cross-Tab', () => {
 
 			// db1 should have received remote event for 'from2'
 			const db1Remote = db1Events.filter((e) => e.source === 'remote')
-			expect(db1Remote.some((e) => e.keys.includes('from2'))).toBe(true)
+			expect(db1Remote.some((e) => e.keys?.includes('from2'))).toBe(true)
 
 			// db2 should have received remote event for 'from1'
 			const db2Remote = db2Events.filter((e) => e.source === 'remote')
-			expect(db2Remote.some((e) => e.keys.includes('from1'))).toBe(true)
+			expect(db2Remote.some((e) => e.keys?.includes('from1'))).toBe(true)
 		})
 	})
 

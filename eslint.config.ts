@@ -76,6 +76,8 @@ export default defineConfig(
 			'@typescript-eslint/no-empty-function': 'off',
 			'@typescript-eslint/no-unsafe-assignment': 'off',
 			'@typescript-eslint/no-unsafe-member-access': 'off',
+			'@typescript-eslint/unbound-method': 'off',
+			'@typescript-eslint/no-non-null-asserted-optional-chain': 'off',
 		},
 	},
 
@@ -86,7 +88,6 @@ export default defineConfig(
 			'@typescript-eslint/no-unsafe-assignment': 'off',
 			'@typescript-eslint/no-unsafe-member-access': 'off',
 			'@typescript-eslint/no-unsafe-argument': 'off',
-			'@typescript-eslint/no-unsafe-call': 'off',
 			'no-console': 'off',
 		},
 	},

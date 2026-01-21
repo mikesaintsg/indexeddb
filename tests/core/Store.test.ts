@@ -665,4 +665,173 @@ describe('Store', () => {
 			expect(count).toBe(100)
 		})
 	})
+
+	// ─── TTL Filtering ───────────────────────────────────────
+
+	describe('TTL filtering', () => {
+		interface CacheRecord {
+			readonly id: string
+			readonly data: string
+			readonly _expiresAt?: number
+		}
+
+		interface CacheSchema extends DatabaseSchema {
+			readonly cache: CacheRecord
+		}
+
+		it('get() filters expired records', async() => {
+			const cacheDbName = createTestDbName()
+			const cacheDb = createDatabase<CacheSchema>({
+				name: cacheDbName,
+				version: 1,
+				stores: {
+					cache: {
+						ttl: { defaultMs: 1000 },
+					},
+				},
+			})
+
+			try {
+				const store = cacheDb.store('cache')
+
+				// Set a record that expires immediately
+				await store.set({
+					id: 'expired',
+					data: 'old data',
+					_expiresAt: Date.now() - 1000, // Already expired
+				})
+
+				// Set a record that won't expire
+				await store.set({
+					id: 'valid',
+					data: 'new data',
+					_expiresAt: Date.now() + 60000, // 1 minute from now
+				})
+
+				// Get should filter expired record
+				const expired = await store.get('expired')
+				const valid = await store.get('valid')
+
+				expect(expired).toBeUndefined()
+				expect(valid?.data).toBe('new data')
+			} finally {
+				await cacheDb.drop()
+			}
+		})
+
+		it('all() filters expired records', async() => {
+			const cacheDbName = createTestDbName()
+			const cacheDb = createDatabase<CacheSchema>({
+				name: cacheDbName,
+				version: 1,
+				stores: {
+					cache: {
+						ttl: { defaultMs: 1000 },
+					},
+				},
+			})
+
+			try {
+				const store = cacheDb.store('cache')
+
+				// Set mixed records
+				await store.set([
+					{ id: 'expired1', data: 'old', _expiresAt: Date.now() - 1000 },
+					{ id: 'valid1', data: 'new', _expiresAt: Date.now() + 60000 },
+					{ id: 'expired2', data: 'old', _expiresAt: Date.now() - 2000 },
+					{ id: 'valid2', data: 'new', _expiresAt: Date.now() + 120000 },
+				])
+
+				// All should only return non-expired
+				const all = await store.all()
+				expect(all.length).toBe(2)
+				expect(all.map(r => r.id).sort()).toEqual(['valid1', 'valid2'])
+			} finally {
+				await cacheDb.drop()
+			}
+		})
+
+		it('isExpired() returns correct status', async() => {
+			const cacheDbName = createTestDbName()
+			const cacheDb = createDatabase<CacheSchema>({
+				name: cacheDbName,
+				version: 1,
+				stores: {
+					cache: {
+						ttl: { defaultMs: 1000 },
+					},
+				},
+			})
+
+			try {
+				const store = cacheDb.store('cache')
+
+				await store.set([
+					{ id: 'expired', data: 'old', _expiresAt: Date.now() - 1000 },
+					{ id: 'valid', data: 'new', _expiresAt: Date.now() + 60000 },
+				])
+
+				expect(await store.isExpired('expired')).toBe(true)
+				expect(await store.isExpired('valid')).toBe(false)
+				expect(await store.isExpired('nonexistent')).toBe(false)
+			} finally {
+				await cacheDb.drop()
+			}
+		})
+
+		it('prune() removes expired records', async() => {
+			const cacheDbName = createTestDbName()
+			const cacheDb = createDatabase<CacheSchema>({
+				name: cacheDbName,
+				version: 1,
+				stores: {
+					cache: {
+						ttl: { defaultMs: 1000 },
+					},
+				},
+			})
+
+			try {
+				const store = cacheDb.store('cache')
+
+				await store.set([
+					{ id: 'expired1', data: 'old', _expiresAt: Date.now() - 1000 },
+					{ id: 'valid', data: 'new', _expiresAt: Date.now() + 60000 },
+					{ id: 'expired2', data: 'old', _expiresAt: Date.now() - 2000 },
+				])
+
+				const result = await store.prune()
+				expect(result.prunedCount).toBe(2)
+				expect(result.remainingCount).toBe(1)
+
+				// Verify only valid record remains
+				const remaining = await store.all()
+				expect(remaining.length).toBe(1)
+				expect(remaining[0]?.id).toBe('valid')
+			} finally {
+				await cacheDb.drop()
+			}
+		})
+
+		it('hasTTL() returns correct status', async() => {
+			expect(db.store('users').hasTTL()).toBe(false)
+
+			const cacheDbName = createTestDbName()
+			const cacheDb = createDatabase<CacheSchema>({
+				name: cacheDbName,
+				version: 1,
+				stores: {
+					cache: {
+						ttl: { defaultMs: 1000 },
+					},
+				},
+			})
+
+			try {
+				expect(cacheDb.store('cache').hasTTL()).toBe(true)
+			} finally {
+				await cacheDb.drop()
+			}
+		})
+	})
 })

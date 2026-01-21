@@ -10,7 +10,7 @@
  * - Transaction abort/commit
  */
 
-import type { DatabaseInterface } from '~/src/types.js'
+import type { DatabaseInterface } from '@mikesaintsg/indexeddb'
 import type { AppSchema, ExampleResult, Post } from './types.js'
 import { SAMPLE_POSTS } from './types.js'
 

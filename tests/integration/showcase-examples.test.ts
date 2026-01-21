@@ -1243,7 +1243,7 @@ describe('Integration: Showcase Examples', () => {
 				let capturedKeys: readonly unknown[] = []
 				const unsub = db.onChange((e) => {
 					if (e.storeName === 'users' && e.type === 'set') {
-						capturedKeys = e.keys
+						capturedKeys = e.keys ?? []
 					}
 				})
 

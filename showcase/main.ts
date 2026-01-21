@@ -16,7 +16,8 @@
  */
 
 import './styles.css'
-import type { DatabaseInterface, ChangeEvent, Unsubscribe } from '~/src/types.js'
+import type { Unsubscribe } from '@mikesaintsg/core'
+import type { DatabaseInterface, ChangeEvent } from '@mikesaintsg/indexeddb'
 import type { ExampleResult, AppSchema, EventLogEntry, User } from './examples/types.js'
 import { SAMPLE_USERS, SAMPLE_POSTS, SAMPLE_SETTINGS } from './examples/types.js'
 import { createShowcaseDatabase } from './examples/database-setup.js'

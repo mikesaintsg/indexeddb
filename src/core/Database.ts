@@ -8,6 +8,7 @@
  * @packageDocumentation
  */
 
+import type { StorageInfo, Unsubscribe } from '@mikesaintsg/core'
 import type {
 	DatabaseSchema,
 	DatabaseOptions,
@@ -23,11 +24,9 @@ import type {
 	ErrorCallback,
 	VersionChangeCallback,
 	BlockedCallback,
-	Unsubscribe,
 	Migration,
 	ExportedData,
 	ImportOptions,
-	StorageEstimate,
 } from '../types.js'
 import {
 	OpenError,
@@ -265,6 +264,8 @@ implements DatabaseInterface<Schema> {
 			name: this.#name,
 			version: this.#version,
 			exportedAt: new Date().toISOString(),
+			databaseName: this.#name,
+			databaseVersion: this.#version,
 			stores,
 		}
 	}
@@ -306,17 +307,18 @@ implements DatabaseInterface<Schema> {
 	/**
 	 * Get storage estimate for this origin.
 	 */
-	async getStorageEstimate(): Promise<StorageEstimate> {
+	async getStorageEstimate(): Promise<StorageInfo> {
 		if (!navigator?.storage?.estimate) {
-			return { usage: 0, quota: 0, percentUsed: 0 }
+			return { usage: 0, quota: 0, available: 0, percentUsed: 0 }
 		}
 
 		const estimate = await navigator.storage.estimate()
 		const usage = estimate.usage ?? 0
 		const quota = estimate.quota ?? 0
-		const percentUsed = quota > 0 ? (usage / quota) * 100 : 0
+		const available = quota - usage
+		const percentUsed = quota > 0 ? usage / quota : 0
 
-		return { usage, quota, percentUsed }
+		return { usage, quota, available, percentUsed }
 	}
 
 	// ─── Subscriptions ───────────────────────────────────────
@@ -501,12 +503,21 @@ implements DatabaseInterface<Schema> {
 			.sort((a, b) => a.version - b.version)
 
 		for (const migration of migrationsToRun) {
-			void migration.migrate({ database: db, transaction: tx, oldVersion, newVersion })
+			const ctx = {
+				database: db,
+				transaction: tx,
+				oldVersion,
+				newVersion,
+				createStore: (name: string, options?: IDBObjectStoreParameters) => db.createObjectStore(name, options),
+				deleteStore: (name: string) => db.deleteObjectStore(name),
+				getStore: (name: string) => tx.objectStore(name),
+			}
+			void migration.migrate(ctx)
 		}
 	}
 
 	#createStore(db: IDBDatabase, name: string, definition: StoreDefinition): void {
-		const keyPath = definition.keyPath === undefined ? DEFAULT_KEY_PATH : definition.keyPath
+		const keyPath = definition.keyPath ?? DEFAULT_KEY_PATH
 		const autoIncrement = definition.autoIncrement ?? DEFAULT_AUTO_INCREMENT
 
 		const options: IDBObjectStoreParameters = { autoIncrement }

@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Build artifacts
+# showcase.html - Committed for demo distribution
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

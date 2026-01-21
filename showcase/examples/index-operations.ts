@@ -9,7 +9,7 @@
  * - Multi-entry indexes for arrays
  */
 
-import type { DatabaseInterface } from '~/src/types.js'
+import type { DatabaseInterface } from '@mikesaintsg/indexeddb'
 import type { AppSchema, ExampleResult } from './types.js'
 
 /**

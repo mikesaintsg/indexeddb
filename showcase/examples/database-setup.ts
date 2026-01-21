@@ -9,7 +9,7 @@
  * - close() and drop()
  */
 
-import { createDatabase } from '~/src/index.js'
+import { createDatabase } from '@mikesaintsg/indexeddb'
 import type { AppSchema } from './types.js'
 
 /**

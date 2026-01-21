@@ -4,6 +4,53 @@
 
 ---
 
+## Critical Rules (Read First)
+
+### Absolute Constraints
+
+| Rule                | Description                                                             |
+|---------------------|-------------------------------------------------------------------------|
+| **No `any`**        | Use `unknown` and narrow with type guards                               |
+| **No `!`**          | No non-null assertions; handle nullability explicitly                   |
+| **No `as`**         | No unsafe casts; narrow from `unknown`                                  |
+| **No dependencies** | Build with native APIs unless explicitly requested                      |
+| **No re-exports**   | Types files define types only; `src/index.ts` is the only barrel export |
+| **Symbols matter**  | Never remove unused code to satisfy linters—implement it                |
+| **Types first**     | Define interfaces in `src/types.ts` before implementation               |
+
+### File Placement Rules
+
+| Content                 | Location                         |
+|-------------------------|----------------------------------|
+| Public types/interfaces | `src/types.ts` (SOURCE OF TRUTH) |
+| Helper functions        | `src/helpers.ts`                 |
+| Constants               | `src/constants.ts`               |
+| Factory functions       | `src/factories.ts`               |
+| Implementations         | `src/core/[domain].ts`           |
+| Tests                   | `tests/` (mirrors `src/`)        |
+
+### Method Naming Semantics
+
+| Prefix                 | Returns             | Use When                      |
+|------------------------|---------------------|-------------------------------|
+| `get`                  | `T \| undefined`    | Optional lookup, check result |
+| `resolve`              | `T` (throws)        | Required lookup, must exist   |
+| `all`                  | readonly collection | Bulk retrieval (not `getAll`) |
+| `is`, `has`            | boolean             | Check existence/state         |
+| `create`, `from`, `of` | instance            | Factory functions             |
+| `on`                   | Unsubscribe fn      | Event subscription            |
+| `destroy`              | void                | Cleanup entire resource       |
+| `close`                | void                | Close connection (can reopen) |
+| `drop`                 | void                | Delete table/store            |
+
+### Interface Suffix Rules
+
+1. Behavioral interface with methods → Add `Interface` suffix
+2. Data-only interface → No suffix
+3. Ends with `Subscriptions` or `Options` → No suffix
+
+---
+
 ## Table of Contents
 
 1. [Quick Reference](#quick-reference)
@@ -31,27 +78,6 @@
 - **Environment:** Isomorphic (browser + Node.js)
 - **Shell:** PowerShell (Windows paths with backslashes, chain with semicolons)
 - **Testing:** Vitest + Playwright for browser tests
-
-### Critical Rules
-| Rule            | Description                                               |
-|-----------------|-----------------------------------------------------------|
-| No `any`        | Use `unknown` and narrow with type guards                 |
-| No `!`          | No non-null assertions; handle nullability explicitly     |
-| No `as`         | No unsafe casts; narrow from `unknown`                    |
-| ESM only        | Use `.js` extensions in imports                           |
-| No dependencies | Build with native APIs unless explicitly requested        |
-| Types first     | Define interfaces in `src/types.ts` before implementation |
-| Symbols matter  | Never remove unused code to satisfy linters—implement it  |
-
-### File Placement
-| Content                 | Location                  |
-|-------------------------|---------------------------|
-| Public types/interfaces | `src/types.ts`            |
-| Helper functions        | `src/helpers.ts`          |
-| Constants               | `src/constants.ts`        |
-| Factory functions       | `src/factories.ts`        |
-| Implementations         | `src/core/[domain]/`      |
-| Tests                   | `tests/` (mirrors `src/`) |
 
 ### Quality Commands
 ```powershell
@@ -241,13 +267,13 @@ class Counter {
 
 ### Type and Class Naming
 
-| Type                      | Suffix      | Example                   | Location             |
-|---------------------------|-------------|---------------------------|----------------------|
-| Interface (behavioral)    | `Interface` | `SessionManagerInterface` | `src/types.ts`       |
-| Interface (data only)     | None        | `Vector2`, `Rectangle`    | `src/types.ts`       |
-| Interface (subscriptions) | None        | `EngineSubscriptions`     | `src/types.ts`       |
-| Interface (options)       | None        | `EngineOptions`           | `src/types.ts`       |
-| Implementation            | None        | `SessionManager`          | `src/core/[domain]/` |
+| Type                      | Suffix      | Example                   | Location               |
+|---------------------------|-------------|---------------------------|------------------------|
+| Interface (behavioral)    | `Interface` | `SessionManagerInterface` | `src/types.ts`         |
+| Interface (data only)     | None        | `Vector2`, `Rectangle`    | `src/types.ts`         |
+| Interface (subscriptions) | None        | `EngineSubscriptions`     | `src/types.ts`         |
+| Interface (options)       | None        | `EngineOptions`           | `src/types.ts`         |
+| Implementation            | None        | `SessionManager`          | `src/core/[domain].ts` |
 
 **Decision Tree for Interface Suffix:**
 1. Does the interface have methods? NO → No suffix needed
@@ -417,9 +443,93 @@ const users = await store.getAll()
 | `src/factories.ts` | Factory functions for creating instances            |
 | `src/index.ts`     | Barrel exports (no logic)                           |
 
+### Folder Organization Philosophy
+
+**Prefer descriptive folders over descriptive file names.** Organize related logic into folders that describe the category, with simple file names inside.
+
+**Nesting Guidelines:**
+- **Nest related items** — Group by domain or category
+- **Don't nest aggressively** — 3-4 levels maximum
+- **Folder name provides context** — File names stay simple
+- **One index.ts per folder** — Re-exports for clean imports
+
+```
+# ✅ CORRECT: Descriptive folders, simple file names
+src/
+  adapters/
+    storage/
+      indexeddb.ts     # IndexedDB adapter
+      filesystem.ts    # Filesystem adapter
+      index.ts         # Re-exports
+    providers/
+      openai.ts        # OpenAI provider
+      anthropic.ts     # Anthropic provider
+      index.ts         # Re-exports
+    index.ts           # Re-exports all adapters
+  core/
+      Engine.ts        # Engine implementation
+      Session.ts       # Session implementation
+
+# ❌ WRONG: Flat structure with verbose file names
+src/adapters/
+  indexeddb-storage-adapter.ts
+  filesystem-storage-adapter.ts
+  openai-provider-adapter.ts
+  anthropic-provider-adapter.ts
+
+# ❌ WRONG: Too deeply nested
+src/core/engine/internal/handlers/events/lifecycle/init.ts
+```
+
+**Why this pattern:**
+- Folder hierarchy provides context — file names don't need to repeat it
+- Related files are visually grouped in file explorers
+- Easier to navigate deep hierarchies
+- Barrel exports (`index.ts`) make imports clean
+- Category is obvious from path: `adapters/storage/indexeddb.ts`
+
+**Folder naming rules:**
+- Use **plural nouns** for categories: `adapters/`, `services/`, `utils/`
+- Use **singular or descriptive names** for domains: `storage/`, `auth/`
+- Use **PascalCase** for class files: `Engine.ts`, `Session.ts`
+- Use **camelCase** for function files: `helpers.ts`, `factories.ts`
+- Keep **folder depth reasonable** (3-4 levels max)
+
+### Test Import Guidelines
+
+**Always use aliased package imports in tests, never relative paths:**
+
+```typescript
+// ✅ CORRECT: Aliased import from package
+import { createDatabase } from '@scope/package'
+import type { DatabaseOptions } from '@scope/package'
+
+// ❌ WRONG: Relative path imports
+import { createDatabase } from '../../../src/database.js'
+import type { DatabaseOptions } from '../../../src/types.js'
+```
+
+**Why aliased imports in tests:**
+- Tests verify the public API as consumers would use it
+- Ensures exports are correctly configured in barrel files
+- No path depth wrangling when moving test files
+- Catches missing exports early
+- Documents the intended public API
+
+**Configure alias in tsconfig.json:**
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@scope/package": ["./src/index.ts"]
+    }
+  }
+}
+```
+
 ### CRITICAL: No Internal Definitions in Implementation Files
 
-**Implementation files (`src/core/[domain]/*.ts`) should ONLY contain:**
+**Implementation files (`src/core/[domain].ts`) should ONLY contain:**
 - Class implementations
 - Private methods and fields using `#`
 - Imports from centralized files
@@ -443,7 +553,7 @@ const users = await store.getAll()
 
 ```typescript
 // ❌ WRONG: Internal type in implementation file
-// src/core/database/Database.ts
+// src/core/Database.ts
 interface InternalCacheEntry {
 	readonly key: string
 	readonly value: unknown
@@ -462,7 +572,7 @@ export interface CacheEntry {
 	readonly expiresAt: number
 }
 
-// src/core/database/Database.ts
+// src/core/Database.ts
 import type { CacheEntry } from '../../types.js'
 
 class Database {
@@ -546,11 +656,11 @@ project/
 
 ### Planning Hierarchy
 
-| Level | File | Scope | Updates |
-|-------|------|-------|---------|
-| Strategic | `PLAN.md` | Entire project | Rarely, major pivots only |
-| Tactical | `phases/*.md` | Current phase | After each milestone |
-| Operational | `copilot-instructions.md` | Every task | Almost never |
+| Level       | File                      | Scope          | Updates                   |
+|-------------|---------------------------|----------------|---------------------------|
+| Strategic   | `PLAN.md`                 | Entire project | Rarely, major pivots only |
+| Tactical    | `phases/*.md`             | Current phase  | After each milestone      |
+| Operational | `copilot-instructions.md` | Every task     | Almost never              |
 
 ### Optional Folders
 
@@ -607,22 +717,22 @@ export default defineConfig({
 
 ### Types-First Development Flow
 
-| Phase | Focus             | Key Activities                                                       |
-|-------|-------------------|----------------------------------------------------------------------|
-| 1     | Types             | Define interfaces in `src/types.ts` with `Interface` suffix          |
-| 2     | Implementation    | Implement in `src/core/[domain]/` using factory functions            |
-| 3     | Factories         | Create factory functions in `src/factories.ts`                       |
-| 4     | Unit Tests        | Write tests in `tests/` mirroring source structure                   |
-| 5     | Documentation     | Update guides and README.md                                          |
-| 6     | Sandbox           | Create integration in sandbox folder                                 |
-| 7     | Integration Tests | Write tests in `tests/integration/`                                  |
-| 8     | Review            | Run quality gates, commit                                            |
+| Phase | Focus             | Key Activities                                              |
+|-------|-------------------|-------------------------------------------------------------|
+| 1     | Types             | Define interfaces in `src/types.ts` with `Interface` suffix |
+| 2     | Implementation    | Implement in `src/core/[domain].ts` using factory functions |
+| 3     | Factories         | Create factory functions in `src/factories.ts`              |
+| 4     | Unit Tests        | Write tests in `tests/` mirroring source structure          |
+| 5     | Documentation     | Update guides and README.md                                 |
+| 6     | Sandbox           | Create integration in sandbox folder                        |
+| 7     | Integration Tests | Write tests in `tests/integration/`                         |
+| 8     | Review            | Run quality gates, commit                                   |
 
 ### File Creation Order
 
 ```
 1. src/types.ts          ← Interfaces (SOURCE OF TRUTH)
-2. src/core/[domain]/    ← Implementations
+2. src/core/[domain].ts    ← Implementations
 3. src/helpers.ts        ← Utilities
 4. src/constants.ts      ← Constants
 5. src/factories.ts      ← Factories
@@ -701,6 +811,65 @@ export interface SystemInterface extends SystemSubscriptions {
 4. State interface is always readonly
 
 **Type Ordering:** State → Subscriptions → Options → Interface
+
+### Factory Pattern with Required Adapters
+
+When a system requires a primary dependency (adapter) to function, use this pattern:
+
+```typescript
+// ✅ CORRECT: Required adapter is first parameter
+const system = createSystem(requiredAdapter, {
+	optionalAdapter?: SomeAdapterInterface,
+	configOption?: boolean,
+	onEvent?: (data) => void,
+})
+
+// ❌ WRONG: Required adapter hidden in options
+const system = createSystem({
+	adapter: requiredAdapter,  // Don't do this
+	optionalAdapter?: ...,
+})
+```
+
+**Key Rules:**
+1. Required adapter is always the **first parameter** (not in options)
+2. Optional adapters are in the **options object** (second parameter)
+3. All optional adapters are **opt-in** — nothing enabled by default
+4. Factory returns the system interface
+
+**Pattern Structure:**
+
+```typescript
+// Factory function signature
+export type CreateSystem = (
+	requiredAdapter: RequiredAdapterInterface,
+	options?: SystemOptions
+) => SystemInterface
+
+// Options contain only optional adapters and configuration
+export interface SystemOptions extends SubscriptionToHook<SystemSubscriptions> {
+	readonly optionalAdapter?: OptionalAdapterInterface
+	readonly configOption?: boolean
+}
+```
+
+**Why this pattern:**
+- Clear dependency — the required adapter is explicit
+- Opt-in design — nothing hidden
+- Composable — adapters are peers, not layers
+- Type-safe — each port has a typed interface
+
+### Adapter Categories
+
+Adapters fall into these categories:
+
+| Category        | Purpose                      | Examples                          |
+|-----------------|------------------------------|-----------------------------------|
+| **Source**      | Generate or retrieve data    | Provider, Embedding               |
+| **Persistence** | Store and load data          | IndexedDB, OPFS, HTTP             |
+| **Transform**   | Transform data formats       | ToolFormat, Token, Similarity     |
+| **Policy**      | Apply policies to operations | Retry, RateLimit                  |
+| **Enhancement** | Add capabilities             | Cache, Batch, Reranker            |
 
 ### Result Pattern
 
@@ -1071,7 +1240,7 @@ npm test         # Unit tests
 - **ALWAYS** extract types to `src/types.ts`, even if only used in one file
 - **ALWAYS** extract helper functions to `src/helpers.ts`
 - **ALWAYS** extract constants to `src/constants.ts`
-- Implementation files (`src/core/[domain]/`) contain ONLY class implementations
+- Implementation files (`src/core/[domain].ts`) contain ONLY class implementations
 
 ### Communication Style
 

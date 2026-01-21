@@ -11,8 +11,8 @@
  * - all(), keys(), count(), clear()
  */
 
-import type { DatabaseInterface } from '~/src/types.js'
-import { isNotFoundError, isConstraintError } from '~/src/index.js'
+import type { DatabaseInterface } from '@mikesaintsg/indexeddb'
+import { isNotFoundError, isConstraintError } from '@mikesaintsg/indexeddb'
 import type { AppSchema, User, ExampleResult } from './types.js'
 import { SAMPLE_USERS } from './types.js'
 
@@ -384,9 +384,9 @@ export async function demonstrateExport(db: DatabaseInterface<AppSchema>): Promi
 			version: exported.version,
 			exportedAt: exported.exportedAt,
 			stores: {
-				users: exported.stores.users.length + ' records',
-				posts: exported.stores.posts.length + ' records',
-				settings: exported.stores.settings.length + ' records',
+				users: (exported.stores.users?.length ?? 0) + ' records',
+				posts: (exported.stores.posts?.length ?? 0) + ' records',
+				settings: (exported.stores.settings?.length ?? 0) + ' records',
 			},
 		},
 		code: `

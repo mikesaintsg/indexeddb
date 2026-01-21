@@ -8,7 +8,7 @@
  * - Error wrapping and native error handling
  */
 
-import type { DatabaseInterface } from '~/src/types.js'
+import type { DatabaseInterface } from '@mikesaintsg/indexeddb'
 import {
 	NotFoundError,
 	ConstraintError,
@@ -16,7 +16,7 @@ import {
 	isNotFoundError,
 	isConstraintError,
 	hasErrorCode,
-} from '~/src/index.js'
+} from '@mikesaintsg/indexeddb'
 import type { AppSchema, ExampleResult } from './types.js'
 
 /**

@@ -22,6 +22,13 @@
 npm install @mikesaintsg/indexeddb
 ```
 
+**Note:** This package depends on `@mikesaintsg/core` for shared types. Import shared types directly:
+
+```typescript
+import type { Unsubscribe, ChangeSource, PruneResult, StorageInfo } from '@mikesaintsg/core'
+import { createDatabase } from '@mikesaintsg/indexeddb'
+```
+
 ## Quick Start
 
 ```typescript
@@ -106,10 +113,10 @@ npm run dev
 | Query builder    | ✅ IDBKeyRange based  | ⚠️ Over-abstracted | ❌ None     |
 | Auto batching    | ✅ Yes                | ✅ Yes              | ❌ No       |
 | Cross-tab sync   | ✅ BroadcastChannel   | ⚠️ Custom          | ❌ No       |
-| Bundle size (gz) | ~9KB                 | ~30KB              | ~1KB       |
-| Dependencies     | 0                    | 0                  | 0          |
+| Bundle size (gz) | ~11KB                | ~30KB              | ~1KB       |
+| Dependencies     | 1 (core)             | 0                  | 0          |
 
-> **Note:** This library provides more features than `idb` (query builder, batching, cross-tab sync) while remaining smaller than `Dexie.js`. The full bundle is ~46KB (~9KB gzipped).
+> **Note:** This library provides more features than `idb` (query builder, batching, cross-tab sync) while remaining smaller than `Dexie.js`. The full bundle is ~56KB (~11KB gzipped).
 
 ## License
 

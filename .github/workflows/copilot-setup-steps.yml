@@ -1,4 +1,4 @@
-name: copilot-setup-steps. yml
+name: copilot-setup-steps.yml
 
 # This workflow defines setup steps for GitHub Copilot to run before it performs tasks.
 # Automatically runs when the workflow is changed to allow for easy validation,

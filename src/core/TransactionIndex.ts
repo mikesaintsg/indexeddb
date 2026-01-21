@@ -13,6 +13,7 @@ import type {
 	CursorOptions,
 	KeyCursorInterface,
 	KeyPath,
+	TransactionIndexInterface,
 	ValidKey,
 } from '../types.js'
 import { NotFoundError, wrapError } from '../errors.js'
@@ -31,7 +32,7 @@ import { KeyCursor } from './KeyCursor.js'
  * Note: `query()`, `iterate()`, and `iterateKeys()` are not available
  * on `TransactionIndex` as they require transaction lifecycle control.
  */
-export class TransactionIndex<T> {
+export class TransactionIndex<T> implements TransactionIndexInterface<T> {
 	readonly #index: IDBIndex
 	readonly #storeName: string
 
